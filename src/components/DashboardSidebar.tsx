@@ -1,6 +1,6 @@
 
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, Home, ListOrdered, LogOut, PieChart, Settings, User, Users } from 'lucide-react';
+import { BarChart3, ChevronLeft, Home, ListOrdered, LogOut, PieChart, Settings, User, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,10 +20,13 @@ const DashboardSidebar = () => {
   
   return (
     <div className="h-screen w-64 flex flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
-      <div className="p-6">
+      <div className="p-6 flex items-center justify-between">
         <h1 className="text-xl font-bold text-sidebar-foreground">
           Sales Compass
         </h1>
+        <Link to="/" className="text-sidebar-foreground hover:text-sidebar-foreground/80">
+          <ChevronLeft size={20} />
+        </Link>
       </div>
       
       <div className="px-4 py-2">
