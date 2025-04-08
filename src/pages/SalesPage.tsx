@@ -7,11 +7,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { PlusCircle, Edit, Trash2, ArrowRight, ReceiptText, Users } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, ArrowRight, ReceiptText, Users, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 
 // Define types for our data
 interface Customer {
@@ -61,6 +64,7 @@ const SalesPage = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [sales, setSales] = useState<Sale[]>([]);
+  const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -71,9 +75,13 @@ const SalesPage = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [customerSummaries, setCustomerSummaries] = useState<CustomerSummary[]>([]);
+  const [displayedCustomerSummaries, setDisplayedCustomerSummaries] = useState<CustomerSummary[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerSummary | null>(null);
   const [customerSales, setCustomerSales] = useState<Sale[]>([]);
-  
+  const [filteredCustomerSales, setFilteredCustomerSales] = useState<Sale[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+
   // Form state for adding/editing sale
   const [saleForm, setSaleForm] = useState<{
     transno: string;
@@ -102,6 +110,45 @@ const SalesPage = () => {
     setSaleForm(prev => ({ ...prev, total }));
     return total;
   };
+
+  // Filter sales based on search query
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredSales(sales);
+    } else {
+      const query = searchQuery.toLowerCase();
+      const filtered = sales.filter(sale => 
+        sale.transno.toLowerCase().includes(query) ||
+        sale.customerName?.toLowerCase().includes(query) ||
+        sale.employeeName?.toLowerCase().includes(query) ||
+        new Date(sale.salesdate).toLocaleDateString().includes(query) ||
+        String(sale.total).includes(query)
+      );
+      setFilteredSales(filtered);
+    }
+  }, [searchQuery, sales]);
+
+  // Filter customer sales based on search query
+  useEffect(() => {
+    if (customerSearchQuery.trim() === '') {
+      setFilteredCustomerSales(customerSales);
+    } else {
+      const query = customerSearchQuery.toLowerCase();
+      const filtered = customerSales.filter(sale => 
+        sale.transno.toLowerCase().includes(query) ||
+        new Date(sale.salesdate).toLocaleDateString().includes(query) ||
+        sale.employeeName?.toLowerCase().includes(query) ||
+        String(sale.total).includes(query)
+      );
+      setFilteredCustomerSales(filtered);
+    }
+  }, [customerSearchQuery, customerSales]);
+
+  // Filter and limit customer summaries to display
+  useEffect(() => {
+    // Show all customer summaries for now, we'll only limit the display in UI
+    setDisplayedCustomerSummaries(customerSummaries);
+  }, [customerSummaries]);
   
   // Load sales data
   const fetchSales = async () => {
@@ -184,6 +231,7 @@ const SalesPage = () => {
       }));
       
       setSales(salesWithNames);
+      setFilteredSales(salesWithNames);
       
       // Calculate customer summaries
       const summaries: Record<string, CustomerSummary> = {};
@@ -289,6 +337,8 @@ const SalesPage = () => {
       // Filter sales for this customer
       const customerSales = sales.filter(sale => sale.custno === customer.custno);
       setCustomerSales(customerSales);
+      setFilteredCustomerSales(customerSales);
+      setCustomerSearchQuery('');
       
       setIsReceiptDialogOpen(true);
     } catch (error) {
@@ -565,8 +615,8 @@ const SalesPage = () => {
   
   return (
     <DashboardLayout>
-      <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Sales Transactions</h1>
           <Button onClick={initAddSaleForm} className="bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800">
             <PlusCircle className="mr-2 h-4 w-4" />
@@ -575,7 +625,7 @@ const SalesPage = () => {
         </div>
         
         {/* Customer Summaries */}
-        <div className="mb-6">
+        <div>
           <Card className="shadow-md border-t-4 border-purple-500">
             <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700">
               <CardTitle className="flex items-center">
@@ -584,42 +634,67 @@ const SalesPage = () => {
               </CardTitle>
               <CardDescription>View total sales by customer</CardDescription>
             </CardHeader>
-            <CardContent className="pt-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {customerSummaries.length > 0 ? (
-                  customerSummaries.map((customer) => (
-                    <Card key={customer.custno} className="hover:shadow-lg transition-shadow">
-                      <CardHeader className="py-3 px-4">
-                        <CardTitle className="text-base font-medium">{customer.custname}</CardTitle>
-                      </CardHeader>
-                      <CardContent className="py-2 px-4">
-                        <div className="flex flex-col space-y-1">
-                          <p className="text-sm text-muted-foreground">
-                            Total Sales: <span className="font-medium text-base">${customer.totalSales.toFixed(2)}</span>
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Number of Transactions: {customer.saleCount}
-                          </p>
-                        </div>
-                      </CardContent>
-                      <CardFooter className="py-2 px-4">
-                        <Button 
-                          variant="outline" 
-                          className="w-full flex items-center justify-center text-purple-600 hover:text-purple-700 hover:bg-purple-50"
-                          onClick={() => viewCustomerReceipt(customer)}
-                        >
-                          <ReceiptText className="mr-2 h-4 w-4" />
-                          View Receipt
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  ))
-                ) : (
-                  <div className="col-span-full text-center py-8 text-muted-foreground">
-                    No customer summaries available. Create sales to see customer summaries.
-                  </div>
-                )}
+            <CardContent>
+              <div className="mb-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Search customers..." 
+                    className="pl-10"
+                    onChange={(e) => {
+                      const query = e.target.value.toLowerCase();
+                      if (query === '') {
+                        setDisplayedCustomerSummaries(customerSummaries);
+                      } else {
+                        const filtered = customerSummaries.filter(customer => 
+                          customer.custname.toLowerCase().includes(query) ||
+                          customer.custno.toLowerCase().includes(query) ||
+                          String(customer.totalSales).includes(query) ||
+                          String(customer.saleCount).includes(query)
+                        );
+                        setDisplayedCustomerSummaries(filtered);
+                      }
+                    }}
+                  />
+                </div>
               </div>
+              <ScrollArea className="h-[500px] pr-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {displayedCustomerSummaries.length > 0 ? (
+                    displayedCustomerSummaries.map((customer) => (
+                      <Card key={customer.custno} className="hover:shadow-lg transition-shadow">
+                        <CardHeader className="py-3 px-4">
+                          <CardTitle className="text-base font-medium">{customer.custname}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="py-2 px-4">
+                          <div className="flex flex-col space-y-1">
+                            <p className="text-sm text-muted-foreground">
+                              Total Sales: <span className="font-medium text-base">${customer.totalSales.toFixed(2)}</span>
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Number of Transactions: {customer.saleCount}
+                            </p>
+                          </div>
+                        </CardContent>
+                        <CardFooter className="py-2 px-4">
+                          <Button 
+                            variant="outline" 
+                            className="w-full flex items-center justify-center text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                            onClick={() => viewCustomerReceipt(customer)}
+                          >
+                            <ReceiptText className="mr-2 h-4 w-4" />
+                            View Receipt
+                          </Button>
+                        </CardFooter>
+                      </Card>
+                    ))
+                  ) : (
+                    <div className="col-span-full text-center py-8 text-muted-foreground">
+                      No customer summaries available. Create sales to see customer summaries.
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
             </CardContent>
           </Card>
         </div>
@@ -631,6 +706,17 @@ const SalesPage = () => {
             <CardDescription>View and manage your sales transactions</CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Search transactions..." 
+                  className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -644,14 +730,14 @@ const SalesPage = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sales.length === 0 ? (
+                  {filteredSales.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                        No sales records found. Create your first sale by clicking "New Sale".
+                        {searchQuery ? "No matching sales found. Try a different search." : "No sales records found. Create your first sale by clicking \"New Sale\"."}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    sales.map((sale) => (
+                    filteredSales.map((sale) => (
                       <TableRow key={sale.transno} className="hover:bg-muted/30 transition-colors">
                         <TableCell>{sale.transno}</TableCell>
                         <TableCell>{new Date(sale.salesdate).toLocaleDateString()}</TableCell>
@@ -684,148 +770,150 @@ const SalesPage = () => {
         
         {/* Add Sale Dialog */}
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle>Create New Sale</DialogTitle>
               <DialogDescription>Enter the details for the new sales transaction</DialogDescription>
             </DialogHeader>
             
-            <div className="grid grid-cols-2 gap-4 py-4">
-              <div className="space-y-2">
-                <label htmlFor="transno" className="text-sm font-medium">Transaction Number</label>
-                <Input 
-                  id="transno" 
-                  value={saleForm.transno} 
-                  onChange={(e) => setSaleForm({...saleForm, transno: e.target.value})}
-                  placeholder="Enter transaction number"
-                />
+            <ScrollArea className="pr-4 max-h-[calc(90vh-10rem)]">
+              <div className="grid grid-cols-2 gap-4 py-4">
+                <div className="space-y-2">
+                  <label htmlFor="transno" className="text-sm font-medium">Transaction Number</label>
+                  <Input 
+                    id="transno" 
+                    value={saleForm.transno} 
+                    onChange={(e) => setSaleForm({...saleForm, transno: e.target.value})}
+                    placeholder="Enter transaction number"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label htmlFor="salesdate" className="text-sm font-medium">Sale Date</label>
+                  <Input 
+                    id="salesdate" 
+                    type="date" 
+                    value={saleForm.salesdate} 
+                    onChange={(e) => setSaleForm({...saleForm, salesdate: e.target.value})}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label htmlFor="custno" className="text-sm font-medium">Customer</label>
+                  <Select value={saleForm.custno} onValueChange={(value) => setSaleForm({...saleForm, custno: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select customer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customers.map((customer) => (
+                        <SelectItem key={customer.custno} value={customer.custno}>
+                          {customer.custname}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <label htmlFor="empno" className="text-sm font-medium">Employee</label>
+                  <Select value={saleForm.empno} onValueChange={(value) => setSaleForm({...saleForm, empno: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select employee" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {employees.map((employee) => (
+                        <SelectItem key={employee.empno} value={employee.empno}>
+                          {employee.firstname} {employee.lastname}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               
-              <div className="space-y-2">
-                <label htmlFor="salesdate" className="text-sm font-medium">Sale Date</label>
-                <Input 
-                  id="salesdate" 
-                  type="date" 
-                  value={saleForm.salesdate} 
-                  onChange={(e) => setSaleForm({...saleForm, salesdate: e.target.value})}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="custno" className="text-sm font-medium">Customer</label>
-                <Select value={saleForm.custno} onValueChange={(value) => setSaleForm({...saleForm, custno: value})}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map((customer) => (
-                      <SelectItem key={customer.custno} value={customer.custno}>
-                        {customer.custname}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="empno" className="text-sm font-medium">Employee</label>
-                <Select value={saleForm.empno} onValueChange={(value) => setSaleForm({...saleForm, empno: value})}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select employee" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {employees.map((employee) => (
-                      <SelectItem key={employee.empno} value={employee.empno}>
-                        {employee.firstname} {employee.lastname}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Sale Details</h3>
-                <Button type="button" size="sm" variant="outline" onClick={addDetailLine}>
-                  Add Product
-                </Button>
-              </div>
-              
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Product</TableHead>
-                      <TableHead>Quantity</TableHead>
-                      <TableHead>Unit Price</TableHead>
-                      <TableHead>Subtotal</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {saleForm.details.map((detail, index) => (
-                      <TableRow key={index}>
-                        <TableCell>
-                          <Select 
-                            value={detail.prodcode} 
-                            onValueChange={(value) => updateDetailLine(index, 'prodcode', value)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select product" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {products.map((product) => (
-                                <SelectItem key={product.prodcode} value={product.prodcode}>
-                                  {product.description} - ${product.currentPrice?.toFixed(2)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        
-                        <TableCell>
-                          <Input 
-                            type="number" 
-                            value={detail.quantity} 
-                            onChange={(e) => updateDetailLine(index, 'quantity', e.target.value)}
-                            min="1"
-                            className="w-20"
-                          />
-                        </TableCell>
-                        
-                        <TableCell>
-                          ${detail.unitPrice?.toFixed(2)}
-                        </TableCell>
-                        
-                        <TableCell>
-                          ${detail.subtotal?.toFixed(2)}
-                        </TableCell>
-                        
-                        <TableCell>
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="icon"
-                            disabled={saleForm.details.length <= 1}
-                            onClick={() => removeDetailLine(index)}
-                            className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
+              <div className="space-y-4 mt-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-medium">Sale Details</h3>
+                  <Button type="button" size="sm" variant="outline" onClick={addDetailLine}>
+                    Add Product
+                  </Button>
+                </div>
+                
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Product</TableHead>
+                        <TableHead>Quantity</TableHead>
+                        <TableHead>Unit Price</TableHead>
+                        <TableHead>Subtotal</TableHead>
+                        <TableHead></TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {saleForm.details.map((detail, index) => (
+                        <TableRow key={index}>
+                          <TableCell>
+                            <Select 
+                              value={detail.prodcode} 
+                              onValueChange={(value) => updateDetailLine(index, 'prodcode', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select product" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {products.map((product) => (
+                                  <SelectItem key={product.prodcode} value={product.prodcode}>
+                                    {product.description} - ${product.currentPrice?.toFixed(2)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          
+                          <TableCell>
+                            <Input 
+                              type="number" 
+                              value={detail.quantity} 
+                              onChange={(e) => updateDetailLine(index, 'quantity', e.target.value)}
+                              min="1"
+                              className="w-20"
+                            />
+                          </TableCell>
+                          
+                          <TableCell>
+                            ${detail.unitPrice?.toFixed(2)}
+                          </TableCell>
+                          
+                          <TableCell>
+                            ${detail.subtotal?.toFixed(2)}
+                          </TableCell>
+                          
+                          <TableCell>
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon"
+                              disabled={saleForm.details.length <= 1}
+                              onClick={() => removeDetailLine(index)}
+                              className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                
+                <div className="flex justify-end text-lg font-medium">
+                  Total: ${saleForm.total?.toFixed(2)}
+                </div>
               </div>
-              
-              <div className="flex justify-end text-lg font-medium">
-                Total: ${saleForm.total?.toFixed(2)}
-              </div>
-            </div>
+            </ScrollArea>
             
-            <DialogFooter>
+            <DialogFooter className="mt-4">
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                 Cancel
               </Button>
@@ -838,147 +926,149 @@ const SalesPage = () => {
         
         {/* Edit Sale Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle>Edit Sale - {saleForm.transno}</DialogTitle>
               <DialogDescription>Update the details for this sales transaction</DialogDescription>
             </DialogHeader>
             
-            <div className="grid grid-cols-2 gap-4 py-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Transaction Number</label>
-                <Input 
-                  value={saleForm.transno} 
-                  disabled
-                  className="bg-muted"
-                />
+            <ScrollArea className="pr-4 max-h-[calc(90vh-10rem)]">
+              <div className="grid grid-cols-2 gap-4 py-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Transaction Number</label>
+                  <Input 
+                    value={saleForm.transno} 
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label htmlFor="salesdate" className="text-sm font-medium">Sale Date</label>
+                  <Input 
+                    id="salesdate" 
+                    type="date" 
+                    value={saleForm.salesdate} 
+                    onChange={(e) => setSaleForm({...saleForm, salesdate: e.target.value})}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label htmlFor="custno" className="text-sm font-medium">Customer</label>
+                  <Select value={saleForm.custno} onValueChange={(value) => setSaleForm({...saleForm, custno: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select customer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customers.map((customer) => (
+                        <SelectItem key={customer.custno} value={customer.custno}>
+                          {customer.custname}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <label htmlFor="empno" className="text-sm font-medium">Employee</label>
+                  <Select value={saleForm.empno} onValueChange={(value) => setSaleForm({...saleForm, empno: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select employee" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {employees.map((employee) => (
+                        <SelectItem key={employee.empno} value={employee.empno}>
+                          {employee.firstname} {employee.lastname}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               
-              <div className="space-y-2">
-                <label htmlFor="salesdate" className="text-sm font-medium">Sale Date</label>
-                <Input 
-                  id="salesdate" 
-                  type="date" 
-                  value={saleForm.salesdate} 
-                  onChange={(e) => setSaleForm({...saleForm, salesdate: e.target.value})}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="custno" className="text-sm font-medium">Customer</label>
-                <Select value={saleForm.custno} onValueChange={(value) => setSaleForm({...saleForm, custno: value})}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map((customer) => (
-                      <SelectItem key={customer.custno} value={customer.custno}>
-                        {customer.custname}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="empno" className="text-sm font-medium">Employee</label>
-                <Select value={saleForm.empno} onValueChange={(value) => setSaleForm({...saleForm, empno: value})}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select employee" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {employees.map((employee) => (
-                      <SelectItem key={employee.empno} value={employee.empno}>
-                        {employee.firstname} {employee.lastname}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Sale Details</h3>
-                <Button type="button" size="sm" variant="outline" onClick={addDetailLine}>
-                  Add Product
-                </Button>
-              </div>
-              
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Product</TableHead>
-                      <TableHead>Quantity</TableHead>
-                      <TableHead>Unit Price</TableHead>
-                      <TableHead>Subtotal</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {saleForm.details.map((detail, index) => (
-                      <TableRow key={index}>
-                        <TableCell>
-                          <Select 
-                            value={detail.prodcode} 
-                            onValueChange={(value) => updateDetailLine(index, 'prodcode', value)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select product" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {products.map((product) => (
-                                <SelectItem key={product.prodcode} value={product.prodcode}>
-                                  {product.description} - ${product.currentPrice?.toFixed(2)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        
-                        <TableCell>
-                          <Input 
-                            type="number" 
-                            value={detail.quantity} 
-                            onChange={(e) => updateDetailLine(index, 'quantity', e.target.value)}
-                            min="1"
-                            className="w-20"
-                          />
-                        </TableCell>
-                        
-                        <TableCell>
-                          ${detail.unitPrice?.toFixed(2)}
-                        </TableCell>
-                        
-                        <TableCell>
-                          ${detail.subtotal?.toFixed(2)}
-                        </TableCell>
-                        
-                        <TableCell>
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="icon"
-                            disabled={saleForm.details.length <= 1}
-                            onClick={() => removeDetailLine(index)}
-                            className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
+              <div className="space-y-4 mt-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-medium">Sale Details</h3>
+                  <Button type="button" size="sm" variant="outline" onClick={addDetailLine}>
+                    Add Product
+                  </Button>
+                </div>
+                
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Product</TableHead>
+                        <TableHead>Quantity</TableHead>
+                        <TableHead>Unit Price</TableHead>
+                        <TableHead>Subtotal</TableHead>
+                        <TableHead></TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {saleForm.details.map((detail, index) => (
+                        <TableRow key={index}>
+                          <TableCell>
+                            <Select 
+                              value={detail.prodcode} 
+                              onValueChange={(value) => updateDetailLine(index, 'prodcode', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select product" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {products.map((product) => (
+                                  <SelectItem key={product.prodcode} value={product.prodcode}>
+                                    {product.description} - ${product.currentPrice?.toFixed(2)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          
+                          <TableCell>
+                            <Input 
+                              type="number" 
+                              value={detail.quantity} 
+                              onChange={(e) => updateDetailLine(index, 'quantity', e.target.value)}
+                              min="1"
+                              className="w-20"
+                            />
+                          </TableCell>
+                          
+                          <TableCell>
+                            ${detail.unitPrice?.toFixed(2)}
+                          </TableCell>
+                          
+                          <TableCell>
+                            ${detail.subtotal?.toFixed(2)}
+                          </TableCell>
+                          
+                          <TableCell>
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon"
+                              disabled={saleForm.details.length <= 1}
+                              onClick={() => removeDetailLine(index)}
+                              className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                
+                <div className="flex justify-end text-lg font-medium">
+                  Total: ${saleForm.total?.toFixed(2)}
+                </div>
               </div>
-              
-              <div className="flex justify-end text-lg font-medium">
-                Total: ${saleForm.total?.toFixed(2)}
-              </div>
-            </div>
+            </ScrollArea>
             
-            <DialogFooter>
+            <DialogFooter className="mt-4">
               <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                 Cancel
               </Button>
@@ -991,66 +1081,68 @@ const SalesPage = () => {
         
         {/* View Sale Dialog */}
         <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle>Sale Details - {selectedSale?.transno}</DialogTitle>
               <DialogDescription>View the details of this sales transaction</DialogDescription>
             </DialogHeader>
             
             {selectedSale && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Transaction Number</h3>
-                    <p className="text-base">{selectedSale.transno}</p>
+              <ScrollArea className="pr-4 max-h-[calc(90vh-10rem)]">
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground">Transaction Number</h3>
+                      <p className="text-base">{selectedSale.transno}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground">Date</h3>
+                      <p className="text-base">{new Date(selectedSale.salesdate).toLocaleDateString()}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground">Customer</h3>
+                      <p className="text-base">{selectedSale.customerName}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground">Employee</h3>
+                      <p className="text-base">{selectedSale.employeeName}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Date</h3>
-                    <p className="text-base">{new Date(selectedSale.salesdate).toLocaleDateString()}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Customer</h3>
-                    <p className="text-base">{selectedSale.customerName}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Employee</h3>
-                    <p className="text-base">{selectedSale.employeeName}</p>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <h3 className="text-base font-medium">Products</h3>
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/50">
-                          <TableHead>Product</TableHead>
-                          <TableHead>Quantity</TableHead>
-                          <TableHead>Unit Price</TableHead>
-                          <TableHead className="text-right">Subtotal</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedSale.details?.map((detail, index) => (
-                          <TableRow key={index}>
-                            <TableCell>{detail.productDescription}</TableCell>
-                            <TableCell>{detail.quantity}</TableCell>
-                            <TableCell>${Number(detail.unitPrice).toFixed(2)}</TableCell>
-                            <TableCell className="text-right">${Number(detail.subtotal).toFixed(2)}</TableCell>
+                  
+                  <div className="space-y-2">
+                    <h3 className="text-base font-medium">Products</h3>
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead>Product</TableHead>
+                            <TableHead>Quantity</TableHead>
+                            <TableHead>Unit Price</TableHead>
+                            <TableHead className="text-right">Subtotal</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedSale.details?.map((detail, index) => (
+                            <TableRow key={index}>
+                              <TableCell>{detail.productDescription}</TableCell>
+                              <TableCell>{detail.quantity}</TableCell>
+                              <TableCell>${Number(detail.unitPrice).toFixed(2)}</TableCell>
+                              <TableCell className="text-right">${Number(detail.subtotal).toFixed(2)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end text-lg font-medium">
+                    Total: ${Number(selectedSale.total).toFixed(2)}
                   </div>
                 </div>
-                
-                <div className="flex justify-end text-lg font-medium">
-                  Total: ${Number(selectedSale.total).toFixed(2)}
-                </div>
-              </div>
+              </ScrollArea>
             )}
             
-            <DialogFooter>
+            <DialogFooter className="mt-4">
               <Button onClick={() => setIsViewDialogOpen(false)}>
                 Close
               </Button>
@@ -1079,68 +1171,89 @@ const SalesPage = () => {
         
         {/* Customer Receipt Dialog */}
         <Dialog open={isReceiptDialogOpen} onOpenChange={setIsReceiptDialogOpen}>
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle>Customer Receipt - {selectedCustomer?.custname}</DialogTitle>
               <DialogDescription>View all transactions for this customer</DialogDescription>
             </DialogHeader>
             
             {selectedCustomer && (
-              <div className="space-y-6">
-                <div className="bg-muted/20 p-4 rounded-lg">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Customer</h3>
-                      <p className="text-base font-medium">{selectedCustomer.custname}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Customer ID</h3>
-                      <p className="text-base">{selectedCustomer.custno}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Total Sales</h3>
-                      <p className="text-base font-medium">${selectedCustomer.totalSales.toFixed(2)}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Transactions</h3>
-                      <p className="text-base">{selectedCustomer.saleCount}</p>
+              <ScrollArea className="pr-4 max-h-[calc(90vh-10rem)]">
+                <div className="space-y-6">
+                  <div className="bg-muted/20 p-4 rounded-lg">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <h3 className="text-sm font-medium text-muted-foreground">Customer</h3>
+                        <p className="text-base font-medium">{selectedCustomer.custname}</p>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-muted-foreground">Customer ID</h3>
+                        <p className="text-base">{selectedCustomer.custno}</p>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-muted-foreground">Total Sales</h3>
+                        <p className="text-base font-medium">${selectedCustomer.totalSales.toFixed(2)}</p>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-muted-foreground">Transactions</h3>
+                        <p className="text-base">{selectedCustomer.saleCount}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <h3 className="text-base font-medium">Transaction History</h3>
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/50">
-                          <TableHead>Transaction No</TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Employee</TableHead>
-                          <TableHead className="text-right">Total</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {customerSales.map((sale) => (
-                          <TableRow key={sale.transno}>
-                            <TableCell>{sale.transno}</TableCell>
-                            <TableCell>{new Date(sale.salesdate).toLocaleDateString()}</TableCell>
-                            <TableCell>{sale.employeeName}</TableCell>
-                            <TableCell className="text-right font-medium">${Number(sale.total).toFixed(2)}</TableCell>
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-base font-medium">Transaction History</h3>
+                      <div className="relative w-64">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input 
+                          placeholder="Search transactions..." 
+                          className="pl-10"
+                          value={customerSearchQuery}
+                          onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead>Transaction No</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Employee</TableHead>
+                            <TableHead className="text-right">Total</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredCustomerSales.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                                {customerSearchQuery ? "No matching transactions found." : "No transactions found for this customer."}
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredCustomerSales.map((sale) => (
+                              <TableRow key={sale.transno} className="hover:bg-muted/30 transition-colors">
+                                <TableCell>{sale.transno}</TableCell>
+                                <TableCell>{new Date(sale.salesdate).toLocaleDateString()}</TableCell>
+                                <TableCell>{sale.employeeName}</TableCell>
+                                <TableCell className="text-right font-medium">${Number(sale.total).toFixed(2)}</TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end text-lg font-medium">
+                    Total Amount: ${selectedCustomer.totalSales.toFixed(2)}
                   </div>
                 </div>
-                
-                <div className="flex justify-end text-lg font-medium">
-                  Total Amount: ${selectedCustomer.totalSales.toFixed(2)}
-                </div>
-              </div>
+              </ScrollArea>
             )}
             
-            <DialogFooter>
+            <DialogFooter className="mt-4">
               <Button onClick={() => setIsReceiptDialogOpen(false)}>
                 Close
               </Button>
