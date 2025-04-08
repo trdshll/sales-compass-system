@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -10,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { PlusCircle, Edit, Trash2, ArrowRight } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, ArrowRight, ReceiptText, Users } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 // Define types for our data
@@ -50,6 +49,13 @@ interface Sale {
   total?: number;
 }
 
+interface CustomerSummary {
+  custno: string;
+  custname: string;
+  totalSales: number;
+  saleCount: number;
+}
+
 const SalesPage = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -58,10 +64,14 @@ const SalesPage = () => {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isReceiptDialogOpen, setIsReceiptDialogOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [customerSummaries, setCustomerSummaries] = useState<CustomerSummary[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerSummary | null>(null);
+  const [customerSales, setCustomerSales] = useState<Sale[]>([]);
   
   // Form state for adding/editing sale
   const [saleForm, setSaleForm] = useState<{
@@ -173,6 +183,26 @@ const SalesPage = () => {
       }));
       
       setSales(salesWithNames);
+      
+      // Calculate customer summaries
+      const summaries: Record<string, CustomerSummary> = {};
+      
+      for (const sale of salesWithNames) {
+        if (!summaries[sale.custno]) {
+          summaries[sale.custno] = {
+            custno: sale.custno,
+            custname: sale.customerName || 'Unknown',
+            totalSales: 0,
+            saleCount: 0
+          };
+        }
+        
+        summaries[sale.custno].totalSales += sale.total || 0;
+        summaries[sale.custno].saleCount += 1;
+      }
+      
+      setCustomerSummaries(Object.values(summaries));
+      
     } catch (error) {
       console.error('Error fetching sales:', error);
       toast({
@@ -246,6 +276,26 @@ const SalesPage = () => {
         variant: "destructive",
         title: "Error loading details",
         description: "There was a problem loading the sale details.",
+      });
+    }
+  };
+  
+  // View customer receipt (summary of all sales)
+  const viewCustomerReceipt = async (customer: CustomerSummary) => {
+    try {
+      setSelectedCustomer(customer);
+      
+      // Filter sales for this customer
+      const customerSales = sales.filter(sale => sale.custno === customer.custno);
+      setCustomerSales(customerSales);
+      
+      setIsReceiptDialogOpen(true);
+    } catch (error) {
+      console.error('Error preparing customer receipt:', error);
+      toast({
+        variant: "destructive",
+        title: "Error loading receipt",
+        description: "There was a problem loading the customer receipt.",
       });
     }
   };
@@ -523,6 +573,57 @@ const SalesPage = () => {
           </Button>
         </div>
         
+        {/* Customer Summaries */}
+        <div className="mb-6">
+          <Card className="shadow-md border-t-4 border-purple-500">
+            <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700">
+              <CardTitle className="flex items-center">
+                <Users className="mr-2 h-5 w-5 text-purple-500" />
+                Customer Sales Summaries
+              </CardTitle>
+              <CardDescription>View total sales by customer</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {customerSummaries.length > 0 ? (
+                  customerSummaries.map((customer) => (
+                    <Card key={customer.custno} className="hover:shadow-lg transition-shadow">
+                      <CardHeader className="py-3 px-4">
+                        <CardTitle className="text-base font-medium">{customer.custname}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="py-2 px-4">
+                        <div className="flex flex-col space-y-1">
+                          <p className="text-sm text-muted-foreground">
+                            Total Sales: <span className="font-medium text-base">${customer.totalSales.toFixed(2)}</span>
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Number of Transactions: {customer.saleCount}
+                          </p>
+                        </div>
+                      </CardContent>
+                      <CardFooter className="py-2 px-4">
+                        <Button 
+                          variant="outline" 
+                          className="w-full flex items-center justify-center text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                          onClick={() => viewCustomerReceipt(customer)}
+                        >
+                          <ReceiptText className="mr-2 h-4 w-4" />
+                          View Receipt
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  ))
+                ) : (
+                  <div className="col-span-full text-center py-8 text-muted-foreground">
+                    No customer summaries available. Create sales to see customer summaries.
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        {/* Sales Transactions Table */}
         <Card className="shadow-md border-t-4 border-blue-500">
           <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700">
             <CardTitle>Recent Sales</CardTitle>
@@ -836,168 +937,3 @@ const SalesPage = () => {
                         </TableCell>
                         
                         <TableCell>
-                          <Input 
-                            type="number" 
-                            value={detail.quantity} 
-                            onChange={(e) => updateDetailLine(index, 'quantity', e.target.value)}
-                            min="1"
-                            className="w-20"
-                          />
-                        </TableCell>
-                        
-                        <TableCell>
-                          ${detail.unitPrice?.toFixed(2)}
-                        </TableCell>
-                        
-                        <TableCell>
-                          ${detail.subtotal?.toFixed(2)}
-                        </TableCell>
-                        
-                        <TableCell>
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="icon"
-                            disabled={saleForm.details.length <= 1}
-                            onClick={() => removeDetailLine(index)}
-                            className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              
-              <div className="flex justify-end text-lg font-medium">
-                Total: ${saleForm.total?.toFixed(2)}
-              </div>
-            </div>
-            
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={updateSale} className="bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800">
-                Update Sale
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-        
-        {/* View Sale Details Dialog */}
-        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>Sale Details - {selectedSale?.transno}</DialogTitle>
-              <DialogDescription>
-                Transaction information and line items
-              </DialogDescription>
-            </DialogHeader>
-            
-            {selectedSale && (
-              <>
-                <div className="grid grid-cols-2 gap-4 mb-6 bg-muted/30 p-4 rounded-lg">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Transaction Number</p>
-                    <p className="font-medium">{selectedSale.transno}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Date</p>
-                    <p className="font-medium">{new Date(selectedSale.salesdate).toLocaleDateString()}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Customer</p>
-                    <p className="font-medium">{selectedSale.customerName}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Employee</p>
-                    <p className="font-medium">{selectedSale.employeeName}</p>
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className="text-lg font-medium mb-2">Items</h3>
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Product</TableHead>
-                          <TableHead className="text-center">Quantity</TableHead>
-                          <TableHead className="text-right">Unit Price</TableHead>
-                          <TableHead className="text-right">Subtotal</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedSale.details?.length ? (
-                          selectedSale.details.map((detail, index) => (
-                            <TableRow key={index}>
-                              <TableCell>{detail.productDescription}</TableCell>
-                              <TableCell className="text-center">{detail.quantity}</TableCell>
-                              <TableCell className="text-right">${Number(detail.unitPrice).toFixed(2)}</TableCell>
-                              <TableCell className="text-right">${Number(detail.subtotal).toFixed(2)}</TableCell>
-                            </TableRow>
-                          ))
-                        ) : (
-                          <TableRow>
-                            <TableCell colSpan={4} className="text-center py-4 text-muted-foreground">
-                              No details found for this sale.
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  
-                  <div className="flex justify-end mt-4 text-lg font-medium">
-                    Total: ${selectedSale.total?.toFixed(2)}
-                  </div>
-                </div>
-                
-                <DialogFooter className="gap-2">
-                  <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
-                    Close
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="text-blue-500 hover:text-blue-600 hover:bg-blue-50"
-                    onClick={() => {
-                      setIsViewDialogOpen(false);
-                      setTimeout(() => editSale(selectedSale), 100);
-                    }}
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit
-                  </Button>
-                </DialogFooter>
-              </>
-            )}
-          </DialogContent>
-        </Dialog>
-        
-        {/* Delete Confirmation Dialog */}
-        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will permanently delete the sale transaction #{selectedSale?.transno} and all its details.
-                This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={deleteSale} className="bg-red-500 hover:bg-red-600">
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
-    </DashboardLayout>
-  );
-};
-
-export default SalesPage;
