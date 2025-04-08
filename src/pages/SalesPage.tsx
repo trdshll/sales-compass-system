@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -937,3 +938,218 @@ const SalesPage = () => {
                         </TableCell>
                         
                         <TableCell>
+                          <Input 
+                            type="number" 
+                            value={detail.quantity} 
+                            onChange={(e) => updateDetailLine(index, 'quantity', e.target.value)}
+                            min="1"
+                            className="w-20"
+                          />
+                        </TableCell>
+                        
+                        <TableCell>
+                          ${detail.unitPrice?.toFixed(2)}
+                        </TableCell>
+                        
+                        <TableCell>
+                          ${detail.subtotal?.toFixed(2)}
+                        </TableCell>
+                        
+                        <TableCell>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="icon"
+                            disabled={saleForm.details.length <= 1}
+                            onClick={() => removeDetailLine(index)}
+                            className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              
+              <div className="flex justify-end text-lg font-medium">
+                Total: ${saleForm.total?.toFixed(2)}
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={updateSale} className="bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800">
+                Update Sale
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* View Sale Dialog */}
+        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Sale Details - {selectedSale?.transno}</DialogTitle>
+              <DialogDescription>View the details of this sales transaction</DialogDescription>
+            </DialogHeader>
+            
+            {selectedSale && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground">Transaction Number</h3>
+                    <p className="text-base">{selectedSale.transno}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground">Date</h3>
+                    <p className="text-base">{new Date(selectedSale.salesdate).toLocaleDateString()}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground">Customer</h3>
+                    <p className="text-base">{selectedSale.customerName}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground">Employee</h3>
+                    <p className="text-base">{selectedSale.employeeName}</p>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <h3 className="text-base font-medium">Products</h3>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead>Product</TableHead>
+                          <TableHead>Quantity</TableHead>
+                          <TableHead>Unit Price</TableHead>
+                          <TableHead className="text-right">Subtotal</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedSale.details?.map((detail, index) => (
+                          <TableRow key={index}>
+                            <TableCell>{detail.productDescription}</TableCell>
+                            <TableCell>{detail.quantity}</TableCell>
+                            <TableCell>${Number(detail.unitPrice).toFixed(2)}</TableCell>
+                            <TableCell className="text-right">${Number(detail.subtotal).toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+                
+                <div className="flex justify-end text-lg font-medium">
+                  Total: ${Number(selectedSale.total).toFixed(2)}
+                </div>
+              </div>
+            )}
+            
+            <DialogFooter>
+              <Button onClick={() => setIsViewDialogOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Delete Sale Confirmation */}
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete transaction #{selectedSale?.transno}?
+                This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={deleteSale} className="bg-red-600 hover:bg-red-700">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        
+        {/* Customer Receipt Dialog */}
+        <Dialog open={isReceiptDialogOpen} onOpenChange={setIsReceiptDialogOpen}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Customer Receipt - {selectedCustomer?.custname}</DialogTitle>
+              <DialogDescription>View all transactions for this customer</DialogDescription>
+            </DialogHeader>
+            
+            {selectedCustomer && (
+              <div className="space-y-6">
+                <div className="bg-muted/20 p-4 rounded-lg">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground">Customer</h3>
+                      <p className="text-base font-medium">{selectedCustomer.custname}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground">Customer ID</h3>
+                      <p className="text-base">{selectedCustomer.custno}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground">Total Sales</h3>
+                      <p className="text-base font-medium">${selectedCustomer.totalSales.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground">Transactions</h3>
+                      <p className="text-base">{selectedCustomer.saleCount}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <h3 className="text-base font-medium">Transaction History</h3>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead>Transaction No</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Employee</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {customerSales.map((sale) => (
+                          <TableRow key={sale.transno}>
+                            <TableCell>{sale.transno}</TableCell>
+                            <TableCell>{new Date(sale.salesdate).toLocaleDateString()}</TableCell>
+                            <TableCell>{sale.employeeName}</TableCell>
+                            <TableCell className="text-right font-medium">${Number(sale.total).toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+                
+                <div className="flex justify-end text-lg font-medium">
+                  Total Amount: ${selectedCustomer.totalSales.toFixed(2)}
+                </div>
+              </div>
+            )}
+            
+            <DialogFooter>
+              <Button onClick={() => setIsReceiptDialogOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </DashboardLayout>
+  );
+};
+
+export default SalesPage;
