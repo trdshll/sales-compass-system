@@ -13,6 +13,7 @@ import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import SalesPage from "./pages/SalesPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
+import SettingsPage from "./pages/SettingsPage";
 
 // Create a new QueryClient instance outside of the component
 // This ensures it's not recreated on each render
@@ -73,6 +74,14 @@ const App = () => (
               element={
                 <AuthGuard>
                   <AnalyticsPage />
+                </AuthGuard>
+              } 
+            />
+            <Route 
+              path="/settings" 
+              element={
+                <AuthGuard>
+                  <SettingsPage />
                 </AuthGuard>
               } 
             />

@@ -95,7 +95,7 @@ const DashboardPage = () => {
           </Card>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle>Recent Sales</CardTitle>
@@ -111,27 +111,6 @@ const DashboardPage = () => {
                       <p className="text-xs text-muted-foreground">Customer #{100 + i}</p>
                     </div>
                     <div className="text-sm font-medium">${Math.floor(Math.random() * 1000)}.00</div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Top Products</CardTitle>
-              <CardDescription>Best selling items</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {['Product A', 'Product B', 'Product C'].map((product, i) => (
-                  <div key={i} className="flex items-center gap-4">
-                    <div className="w-2 h-2 rounded-full bg-primary"></div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{product}</p>
-                      <p className="text-xs text-muted-foreground">{Math.floor(Math.random() * 100)} units sold</p>
-                    </div>
-                    <div className="text-sm font-medium">${Math.floor(Math.random() * 10000)}</div>
                   </div>
                 ))}
               </div>
