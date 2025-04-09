@@ -4,6 +4,7 @@ import { BarChart3, DollarSign, TrendingUp, Users } from 'lucide-react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const salesData = [
   { month: 'Jan', sales: 4000 },
@@ -96,45 +97,26 @@ const DashboardPage = () => {
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
-          <Card>
+          <Card className="col-span-2">
             <CardHeader>
               <CardTitle>Recent Sales</CardTitle>
               <CardDescription>Latest transactions</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center gap-4">
-                    <div className="w-2 h-2 rounded-full bg-primary"></div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Sale #{1000 + i}</p>
-                      <p className="text-xs text-muted-foreground">Customer #{100 + i}</p>
+              <ScrollArea className="h-[300px]">
+                <div className="space-y-4">
+                  {Array.from({ length: 10 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-4 p-2 rounded-md hover:bg-muted/50">
+                      <div className="w-2 h-2 rounded-full bg-primary"></div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">Sale #{1000 + i}</p>
+                        <p className="text-xs text-muted-foreground">Customer #{100 + i}</p>
+                      </div>
+                      <div className="text-sm font-medium">${Math.floor(Math.random() * 1000) + 100}.00</div>
                     </div>
-                    <div className="text-sm font-medium">${Math.floor(Math.random() * 1000)}.00</div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Top Salespeople</CardTitle>
-              <CardDescription>Best performers</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {['John Doe', 'Jane Smith', 'Mike Johnson'].map((name, i) => (
-                  <div key={i} className="flex items-center gap-4">
-                    <div className="w-2 h-2 rounded-full bg-primary"></div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{name}</p>
-                      <p className="text-xs text-muted-foreground">{Math.floor(Math.random() * 20)} sales</p>
-                    </div>
-                    <div className="text-sm font-medium">${Math.floor(Math.random() * 50000)}</div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </ScrollArea>
             </CardContent>
           </Card>
         </div>
