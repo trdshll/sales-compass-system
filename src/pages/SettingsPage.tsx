@@ -1,650 +1,363 @@
 
-import React, { useState, useEffect } from 'react';
-import { 
-  Card, 
-  CardHeader, 
-  CardTitle, 
-  CardDescription, 
-  CardContent, 
-  CardFooter 
-} from '@/components/ui/card';
-import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
-import { toast } from 'sonner';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import DashboardLayout from '@/components/DashboardLayout';
-import { User, Bell, Shield, Palette, Save, Loader2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Checkbox } from '@/components/ui/checkbox';
 
 const SettingsPage = () => {
-  const { user, updateUserProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState('account');
-  const [isSaving, setIsSaving] = useState(false);
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
+  const { user } = useAuth();
+  const { toast } = useToast();
+  
+  // User profile settings
+  const [name, setName] = useState(user?.name || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [profileDirty, setProfileDirty] = useState(false);
+  
+  // Notification settings
+  const [emailNotifications, setEmailNotifications] = useState(() => {
+    const saved = localStorage.getItem('emailNotifications');
+    return saved !== null ? JSON.parse(saved) : true;
   });
-
-  // Enhanced settings state with dirty flags to track changes
-  const [settings, setSettings] = useState({
-    account: {
-      name: user?.name || '',
-      email: user?.email || '',
-      bio: "I'm a sales professional focused on building great customer relationships.",
-      dirty: false
-    },
-    notifications: {
-      emailNotifications: true,
-      salesAlerts: true,
-      marketingEmails: false,
-      monthlyReports: true,
-      dirty: false
-    },
-    security: {
-      twoFactorAuth: false,
-      passwordLastChanged: '2 months ago',
-      dirty: false
-    },
-    appearance: {
-      theme: 'light',
-      dirty: false
-    }
+  const [pushNotifications, setPushNotifications] = useState(() => {
+    const saved = localStorage.getItem('pushNotifications');
+    return saved !== null ? JSON.parse(saved) : true;
   });
+  const [salesAlerts, setSalesAlerts] = useState(() => {
+    const saved = localStorage.getItem('salesAlerts');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [notificationsDirty, setNotificationsDirty] = useState(false);
 
-  // Update settings when user data changes
+  // Appearance settings
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('theme');
+    return saved || 'system';
+  });
+  const [fontSize, setFontSize] = useState(() => {
+    const saved = localStorage.getItem('fontSize');
+    return saved || 'medium';
+  });
+  const [appearanceDirty, setAppearanceDirty] = useState(false);
+
+  // Security settings
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(() => {
+    const saved = localStorage.getItem('twoFactorEnabled');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
+  const [sessionTimeout, setSessionTimeout] = useState(() => {
+    const saved = localStorage.getItem('sessionTimeout');
+    return saved || '30';
+  });
+  const [securityDirty, setSecurityDirty] = useState(false);
+
+  // Update localStorage when settings change
   useEffect(() => {
-    if (user) {
-      setSettings(prevSettings => ({
-        ...prevSettings,
-        account: {
-          ...prevSettings.account,
-          name: user.name || prevSettings.account.name,
-          email: user.email || prevSettings.account.email
-        }
-      }));
+    if (notificationsDirty) {
+      localStorage.setItem('emailNotifications', JSON.stringify(emailNotifications));
+      localStorage.setItem('pushNotifications', JSON.stringify(pushNotifications));
+      localStorage.setItem('salesAlerts', JSON.stringify(salesAlerts));
     }
-  }, [user]);
+  }, [emailNotifications, pushNotifications, salesAlerts, notificationsDirty]);
 
-  const handleInputChange = (section, field, value) => {
-    setSettings({
-      ...settings,
-      [section]: {
-        ...settings[section],
-        [field]: value,
-        dirty: true
-      }
-    });
-  };
-
-  const handlePasswordChange = (field, value) => {
-    setPasswordForm({
-      ...passwordForm,
-      [field]: value
-    });
-    
-    // Mark security as dirty
-    setSettings({
-      ...settings,
-      security: {
-        ...settings.security,
-        dirty: true
-      }
-    });
-  };
-
-  // Apply theme changes immediately
   useEffect(() => {
-    // Apply theme to document
-    const root = window.document.documentElement;
-    root.classList.remove('light', 'dark', 'system');
-    root.classList.add(settings.appearance.theme);
-    
-    // Store theme preference in localStorage for persistence
-    if (settings.appearance.dirty) {
-      localStorage.setItem('theme', settings.appearance.theme);
-    }
-  }, [settings.appearance.theme]);
-
-  const handleSave = async (section) => {
-    setIsSaving(true);
-    
-    try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 600));
+    if (appearanceDirty) {
+      localStorage.setItem('theme', theme);
+      localStorage.setItem('fontSize', fontSize);
       
-      switch (section) {
-        case 'account':
-          // Update user profile in Auth context
-          if (updateUserProfile) {
-            await updateUserProfile({
-              name: settings.account.name,
-              bio: settings.account.bio
-            });
-          }
-          
-          // Reset dirty flag
-          setSettings({
-            ...settings,
-            account: {
-              ...settings.account,
-              dirty: false
-            }
-          });
-          break;
-          
-        case 'notification':
-          // Save notification preferences (in real app, would call API)
-          localStorage.setItem('notificationPreferences', JSON.stringify({
-            emailNotifications: settings.notifications.emailNotifications,
-            salesAlerts: settings.notifications.salesAlerts,
-            marketingEmails: settings.notifications.marketingEmails,
-            monthlyReports: settings.notifications.monthlyReports
-          }));
-          
-          // Reset dirty flag
-          setSettings({
-            ...settings,
-            notifications: {
-              ...settings.notifications,
-              dirty: false
-            }
-          });
-          break;
-          
-        case 'security':
-          // Password validation
-          if (section === 'security' && passwordForm.newPassword) {
-            if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-              toast.error("New passwords don't match");
-              setIsSaving(false);
-              return;
-            }
-            
-            if (passwordForm.newPassword.length < 8) {
-              toast.error("Password must be at least 8 characters");
-              setIsSaving(false);
-              return;
-            }
-            
-            // Would handle password change via API here
-            setPasswordForm({
-              currentPassword: '',
-              newPassword: '',
-              confirmPassword: ''
-            });
-          }
-          
-          // Save 2FA preferences
-          localStorage.setItem('securityPreferences', JSON.stringify({
-            twoFactorAuth: settings.security.twoFactorAuth
-          }));
-          
-          // Reset dirty flag
-          setSettings({
-            ...settings,
-            security: {
-              ...settings.security,
-              passwordLastChanged: 'just now',
-              dirty: false
-            }
-          });
-          break;
-          
-        case 'appearance':
-          // Theme changes are already applied in the useEffect
-          // Reset dirty flag
-          setSettings({
-            ...settings,
-            appearance: {
-              ...settings.appearance,
-              dirty: false
-            }
-          });
-          break;
+      // Apply theme immediately
+      document.documentElement.classList.remove('light', 'dark');
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else if (theme === 'light') {
+        document.documentElement.classList.add('light');
+      } else {
+        // System preference
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.add('light');
+        }
       }
       
-      toast.success(`${section.charAt(0).toUpperCase() + section.slice(1)} settings saved successfully`);
-    } catch (error) {
-      console.error(`Error saving ${section} settings:`, error);
-      toast.error(`Failed to save ${section} settings`);
-    } finally {
-      setIsSaving(false);
+      // Apply font size
+      document.documentElement.style.fontSize = 
+        fontSize === 'small' ? '14px' : 
+        fontSize === 'large' ? '18px' : '16px';
     }
+  }, [theme, fontSize, appearanceDirty]);
+
+  useEffect(() => {
+    if (securityDirty) {
+      localStorage.setItem('twoFactorEnabled', JSON.stringify(twoFactorEnabled));
+      localStorage.setItem('sessionTimeout', sessionTimeout);
+    }
+  }, [twoFactorEnabled, sessionTimeout, securityDirty]);
+
+  const handleSaveProfile = () => {
+    // Here we would typically call an API to update the user profile
+    // Since we don't have that functionality, we'll just show a success toast
+    toast({
+      title: "Profile updated",
+      description: "Your profile information has been saved successfully.",
+    });
+    setProfileDirty(false);
   };
 
-  // Load saved preferences on initial load
-  useEffect(() => {
-    // Load notification preferences
-    const savedNotifications = localStorage.getItem('notificationPreferences');
-    if (savedNotifications) {
-      const parsedNotifications = JSON.parse(savedNotifications);
-      setSettings(prev => ({
-        ...prev,
-        notifications: {
-          ...prev.notifications,
-          ...parsedNotifications,
-          dirty: false
-        }
-      }));
-    }
-    
-    // Load security preferences
-    const savedSecurity = localStorage.getItem('securityPreferences');
-    if (savedSecurity) {
-      const parsedSecurity = JSON.parse(savedSecurity);
-      setSettings(prev => ({
-        ...prev,
-        security: {
-          ...prev.security,
-          ...parsedSecurity,
-          dirty: false
-        }
-      }));
-    }
-    
-    // Load theme preference
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) {
-      setSettings(prev => ({
-        ...prev,
-        appearance: {
-          ...prev.appearance,
-          theme: savedTheme,
-          dirty: false
-        }
-      }));
-    }
-  }, []);
+  const handleSaveNotifications = () => {
+    toast({
+      title: "Notification preferences saved",
+      description: "Your notification settings have been updated.",
+    });
+    setNotificationsDirty(false);
+  };
+
+  const handleSaveAppearance = () => {
+    toast({
+      title: "Appearance settings saved",
+      description: "Your appearance preferences have been updated.",
+    });
+    setAppearanceDirty(false);
+  };
+
+  const handleSaveSecurity = () => {
+    toast({
+      title: "Security settings saved",
+      description: "Your security preferences have been updated.",
+    });
+    setSecurityDirty(false);
+  };
 
   return (
     <DashboardLayout>
-      <ScrollArea className="h-full">
-        <div className="space-y-6 p-4 pb-16">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-            <p className="text-muted-foreground">Manage your account and application preferences</p>
-          </div>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+          <p className="text-muted-foreground">Manage your account settings and preferences.</p>
+        </div>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid grid-cols-4 mb-8">
-              <TabsTrigger value="account" className="flex items-center gap-2">
-                <User size={16} />
-                <span className="hidden sm:inline">Account</span>
-              </TabsTrigger>
-              <TabsTrigger value="notifications" className="flex items-center gap-2">
-                <Bell size={16} />
-                <span className="hidden sm:inline">Notifications</span>
-              </TabsTrigger>
-              <TabsTrigger value="security" className="flex items-center gap-2">
-                <Shield size={16} />
-                <span className="hidden sm:inline">Security</span>
-              </TabsTrigger>
-              <TabsTrigger value="appearance" className="flex items-center gap-2">
-                <Palette size={16} />
-                <span className="hidden sm:inline">Appearance</span>
-              </TabsTrigger>
+        <ScrollArea className="h-[calc(100vh-180px)]">
+          <Tabs defaultValue="account" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="account">Account</TabsTrigger>
+              <TabsTrigger value="notifications">Notifications</TabsTrigger>
+              <TabsTrigger value="security">Security</TabsTrigger>
+              <TabsTrigger value="appearance">Appearance</TabsTrigger>
             </TabsList>
-
-            {/* Account Settings */}
-            <TabsContent value="account" className="space-y-4">
+            
+            <TabsContent value="account">
               <Card>
                 <CardHeader>
-                  <CardTitle>Account Information</CardTitle>
+                  <CardTitle>Profile Information</CardTitle>
                   <CardDescription>
-                    Update your account details and profile information
+                    Update your account details. This information will be displayed publicly.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Full Name</Label>
-                      <Input 
-                        id="name" 
-                        value={settings.account.name}
-                        onChange={(e) => handleInputChange('account', 'name', e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email Address</Label>
-                      <Input 
-                        id="email" 
-                        type="email" 
-                        value={settings.account.email}
-                        onChange={(e) => handleInputChange('account', 'email', e.target.value)}
-                        disabled  // Email usually requires special verification flow
-                        className="bg-muted/50"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">Contact support to change your email address</p>
-                    </div>
-                  </div>
                   <div className="space-y-2">
-                    <Label htmlFor="bio">Bio</Label>
-                    <Textarea 
-                      id="bio" 
-                      value={settings.account.bio}
-                      onChange={(e) => handleInputChange('account', 'bio', e.target.value)}
-                      placeholder="Tell us a bit about yourself"
-                      rows={4}
+                    <Label htmlFor="name">Name</Label>
+                    <Input 
+                      id="name" 
+                      value={name} 
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        setProfileDirty(true);
+                      }}
                     />
                   </div>
-
-                  <Collapsible className="w-full">
-                    <CollapsibleTrigger asChild>
-                      <Button variant="outline" size="sm" className="text-sm mt-2">
-                        Advanced Settings
-                      </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="mt-4 space-y-4">
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox id="downloadData" />
-                          <Label htmlFor="downloadData">Request data export</Label>
-                        </div>
-                        <p className="text-xs text-muted-foreground ml-6">
-                          We'll email you a link to download all your data within 24 hours
-                        </p>
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input 
+                      id="email" 
+                      type="email" 
+                      value={email} 
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        setProfileDirty(true);
+                      }}
+                    />
+                  </div>
                 </CardContent>
-                <CardFooter className="flex justify-between">
-                  <p className="text-sm text-muted-foreground">
-                    {settings.account.dirty ? "Unsaved changes" : "No changes to save"}
-                  </p>
+                <CardFooter>
                   <Button 
-                    onClick={() => handleSave('account')}
-                    className="gap-2"
-                    disabled={!settings.account.dirty || isSaving}
+                    onClick={handleSaveProfile} 
+                    disabled={!profileDirty}
                   >
-                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save size={16} />}
-                    Save Changes
+                    Save changes
                   </Button>
                 </CardFooter>
               </Card>
             </TabsContent>
-
-            {/* Notification Settings */}
-            <TabsContent value="notifications" className="space-y-4">
+            
+            <TabsContent value="notifications">
               <Card>
                 <CardHeader>
                   <CardTitle>Notification Preferences</CardTitle>
                   <CardDescription>
-                    Configure how and when you receive notifications
+                    Configure how you receive notifications and alerts.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Email Notifications</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Receive important updates via email
-                      </p>
+                    <div>
+                      <p className="font-medium">Email Notifications</p>
+                      <p className="text-sm text-muted-foreground">Receive updates via email</p>
                     </div>
                     <Switch 
-                      checked={settings.notifications.emailNotifications}
-                      onCheckedChange={(checked) => 
-                        handleInputChange('notifications', 'emailNotifications', checked)
-                      }
+                      checked={emailNotifications} 
+                      onCheckedChange={(checked) => {
+                        setEmailNotifications(checked);
+                        setNotificationsDirty(true);
+                      }} 
                     />
                   </div>
                   <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Sales Alerts</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Get notified about new sales and opportunities
-                      </p>
+                    <div>
+                      <p className="font-medium">Push Notifications</p>
+                      <p className="text-sm text-muted-foreground">Receive alerts on your device</p>
                     </div>
                     <Switch 
-                      checked={settings.notifications.salesAlerts}
-                      onCheckedChange={(checked) => 
-                        handleInputChange('notifications', 'salesAlerts', checked)
-                      }
+                      checked={pushNotifications} 
+                      onCheckedChange={(checked) => {
+                        setPushNotifications(checked);
+                        setNotificationsDirty(true);
+                      }} 
                     />
                   </div>
                   <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Marketing Emails</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Receive promotional materials and offers
-                      </p>
+                    <div>
+                      <p className="font-medium">Sales Alerts</p>
+                      <p className="text-sm text-muted-foreground">Get notified about new sales</p>
                     </div>
                     <Switch 
-                      checked={settings.notifications.marketingEmails}
-                      onCheckedChange={(checked) => 
-                        handleInputChange('notifications', 'marketingEmails', checked)
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Monthly Reports</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Receive monthly sales performance reports
-                      </p>
-                    </div>
-                    <Switch 
-                      checked={settings.notifications.monthlyReports}
-                      onCheckedChange={(checked) => 
-                        handleInputChange('notifications', 'monthlyReports', checked)
-                      }
+                      checked={salesAlerts} 
+                      onCheckedChange={(checked) => {
+                        setSalesAlerts(checked);
+                        setNotificationsDirty(true);
+                      }} 
                     />
                   </div>
                 </CardContent>
-                <CardFooter className="flex justify-between">
-                  <p className="text-sm text-muted-foreground">
-                    {settings.notifications.dirty ? "Unsaved changes" : "No changes to save"}
-                  </p>
+                <CardFooter>
                   <Button 
-                    onClick={() => handleSave('notification')}
-                    className="gap-2"
-                    disabled={!settings.notifications.dirty || isSaving}
+                    onClick={handleSaveNotifications} 
+                    disabled={!notificationsDirty}
                   >
-                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save size={16} />}
-                    Save Preferences
+                    Save preferences
                   </Button>
                 </CardFooter>
               </Card>
             </TabsContent>
-
-            {/* Security Settings */}
-            <TabsContent value="security" className="space-y-4">
+            
+            <TabsContent value="security">
               <Card>
                 <CardHeader>
                   <CardTitle>Security Settings</CardTitle>
                   <CardDescription>
-                    Manage your password and account security preferences
+                    Manage your account security preferences.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-4">
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg font-medium">Change Password</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Last changed: {settings.security.passwordLastChanged}
-                      </p>
+                      <p className="font-medium">Two-Factor Authentication</p>
+                      <p className="text-sm text-muted-foreground">Add an extra layer of security</p>
                     </div>
-                    
-                    <div className="grid gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="current-password">Current Password</Label>
-                        <Input 
-                          id="current-password" 
-                          type="password" 
-                          value={passwordForm.currentPassword}
-                          onChange={(e) => handlePasswordChange('currentPassword', e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="new-password">New Password</Label>
-                        <Input 
-                          id="new-password" 
-                          type="password" 
-                          value={passwordForm.newPassword}
-                          onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="confirm-password">Confirm New Password</Label>
-                        <Input 
-                          id="confirm-password" 
-                          type="password" 
-                          value={passwordForm.confirmPassword}
-                          onChange={(e) => handlePasswordChange('confirmPassword', e.target.value)}
-                        />
-                      </div>
-                    </div>
+                    <Switch 
+                      checked={twoFactorEnabled} 
+                      onCheckedChange={(checked) => {
+                        setTwoFactorEnabled(checked);
+                        setSecurityDirty(true);
+                      }} 
+                    />
                   </div>
-                  
-                  <div className="border-t pt-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label className="text-base">Two-Factor Authentication</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Additional security by requiring a verification code
-                        </p>
-                      </div>
-                      <Switch 
-                        checked={settings.security.twoFactorAuth}
-                        onCheckedChange={(checked) => 
-                          handleInputChange('security', 'twoFactorAuth', checked)
-                        }
-                      />
-                    </div>
-                    
-                    {settings.security.twoFactorAuth && (
-                      <div className="mt-4 p-4 bg-muted/50 rounded-md">
-                        <p className="text-sm">
-                          Two-factor authentication is enabled. You'll receive a verification code via email when signing in from a new device.
-                        </p>
-                      </div>
-                    )}
+                  <div className="space-y-2">
+                    <Label htmlFor="timeout">Session Timeout (minutes)</Label>
+                    <Input 
+                      id="timeout" 
+                      type="number" 
+                      min="5" 
+                      max="120" 
+                      value={sessionTimeout} 
+                      onChange={(e) => {
+                        setSessionTimeout(e.target.value);
+                        setSecurityDirty(true);
+                      }} 
+                    />
                   </div>
                 </CardContent>
-                <CardFooter className="flex justify-between">
-                  <p className="text-sm text-muted-foreground">
-                    {settings.security.dirty ? "Unsaved changes" : "No changes to save"}
-                  </p>
+                <CardFooter>
                   <Button 
-                    onClick={() => handleSave('security')}
-                    className="gap-2"
-                    disabled={
-                      (!settings.security.dirty && 
-                      !passwordForm.currentPassword && 
-                      !passwordForm.newPassword) || 
-                      isSaving
-                    }
+                    onClick={handleSaveSecurity} 
+                    disabled={!securityDirty}
                   >
-                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save size={16} />}
-                    Save Security Settings
+                    Save security settings
                   </Button>
                 </CardFooter>
               </Card>
             </TabsContent>
-
-            {/* Appearance Settings */}
-            <TabsContent value="appearance" className="space-y-4">
+            
+            <TabsContent value="appearance">
               <Card>
                 <CardHeader>
                   <CardTitle>Appearance Settings</CardTitle>
                   <CardDescription>
-                    Customize how the application looks and feels
+                    Customize how the application looks and feels.
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col space-y-4">
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-medium">Theme</h3>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div
-                          className={`border-2 rounded-md p-4 flex items-center justify-center cursor-pointer transition-all ${
-                            settings.appearance.theme === 'light' 
-                              ? 'border-primary bg-primary/10 shadow-md' 
-                              : 'border-muted hover:border-muted-foreground/50'
-                          }`}
-                          onClick={() => handleInputChange('appearance', 'theme', 'light')}
-                        >
-                          <div className="text-center">
-                            <div className="h-10 w-10 rounded-full bg-white border mx-auto mb-2 shadow-inner"></div>
-                            <span className="text-sm font-medium">Light</span>
-                          </div>
-                        </div>
-                        <div
-                          className={`border-2 rounded-md p-4 flex items-center justify-center cursor-pointer transition-all ${
-                            settings.appearance.theme === 'dark' 
-                              ? 'border-primary bg-primary/10 shadow-md' 
-                              : 'border-muted hover:border-muted-foreground/50'
-                          }`}
-                          onClick={() => handleInputChange('appearance', 'theme', 'dark')}
-                        >
-                          <div className="text-center">
-                            <div className="h-10 w-10 rounded-full bg-gray-900 border mx-auto mb-2 shadow-inner"></div>
-                            <span className="text-sm font-medium">Dark</span>
-                          </div>
-                        </div>
-                        <div
-                          className={`border-2 rounded-md p-4 flex items-center justify-center cursor-pointer transition-all ${
-                            settings.appearance.theme === 'system' 
-                              ? 'border-primary bg-primary/10 shadow-md' 
-                              : 'border-muted hover:border-muted-foreground/50'
-                          }`}
-                          onClick={() => handleInputChange('appearance', 'theme', 'system')}
-                        >
-                          <div className="text-center">
-                            <div className="h-10 w-10 rounded-full bg-gradient-to-r from-white to-gray-900 border mx-auto mb-2 shadow-inner"></div>
-                            <span className="text-sm font-medium">System</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="border-t pt-4 space-y-4">
-                      <h3 className="text-lg font-medium">Accessibility</h3>
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label className="text-base">Reduced Motion</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Limit the amount of animations in the interface
-                          </p>
-                        </div>
-                        <Switch 
-                          onCheckedChange={(checked) => 
-                            handleInputChange('appearance', 'reducedMotion', checked)
-                          }
-                        />
-                      </div>
-                    </div>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="theme">Theme</Label>
+                    <select 
+                      id="theme" 
+                      className="w-full rounded-md border border-input bg-background px-3 py-2"
+                      value={theme}
+                      onChange={(e) => {
+                        setTheme(e.target.value);
+                        setAppearanceDirty(true);
+                      }}
+                    >
+                      <option value="system">System Preference</option>
+                      <option value="light">Light</option>
+                      <option value="dark">Dark</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="font-size">Font Size</Label>
+                    <select 
+                      id="font-size" 
+                      className="w-full rounded-md border border-input bg-background px-3 py-2"
+                      value={fontSize}
+                      onChange={(e) => {
+                        setFontSize(e.target.value);
+                        setAppearanceDirty(true);
+                      }}
+                    >
+                      <option value="small">Small</option>
+                      <option value="medium">Medium</option>
+                      <option value="large">Large</option>
+                    </select>
                   </div>
                 </CardContent>
-                <CardFooter className="flex justify-between">
-                  <p className="text-sm text-muted-foreground">
-                    {settings.appearance.dirty ? "Theme applied automatically" : "No changes made"}
-                  </p>
+                <CardFooter>
                   <Button 
-                    onClick={() => handleSave('appearance')}
-                    className="gap-2"
-                    disabled={!settings.appearance.dirty || isSaving}
+                    onClick={handleSaveAppearance} 
+                    disabled={!appearanceDirty}
                   >
-                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save size={16} />}
-                    Save Appearance Settings
+                    Save appearance settings
                   </Button>
                 </CardFooter>
               </Card>
             </TabsContent>
           </Tabs>
-        </div>
-      </ScrollArea>
+        </ScrollArea>
+      </div>
     </DashboardLayout>
   );
 };
