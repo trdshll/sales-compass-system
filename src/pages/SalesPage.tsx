@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -918,3 +919,322 @@ const SalesPage = () => {
             
             <DialogFooter className="mt-4">
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={addSale}>Create Sale</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* View Sale Dialog */}
+        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden">
+            <DialogHeader>
+              <DialogTitle>Sale Details</DialogTitle>
+              <DialogDescription>
+                Transaction #{selectedSale?.transno} - {selectedSale?.salesdate && new Date(selectedSale.salesdate).toLocaleDateString()}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <ScrollArea className="pr-4 max-h-[calc(90vh-10rem)]">
+              {selectedSale && (
+                <div className="space-y-6 py-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground">Customer</h3>
+                      <p className="text-base">{selectedSale.customerName}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground">Employee</h3>
+                      <p className="text-base">{selectedSale.employeeName}</p>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-lg font-medium mb-3">Items</h3>
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Product</TableHead>
+                            <TableHead>Quantity</TableHead>
+                            <TableHead>Unit Price</TableHead>
+                            <TableHead className="text-right">Subtotal</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedSale.details?.map((detail, index) => (
+                            <TableRow key={index}>
+                              <TableCell>{detail.productDescription}</TableCell>
+                              <TableCell>{detail.quantity}</TableCell>
+                              <TableCell>${detail.unitPrice?.toFixed(2)}</TableCell>
+                              <TableCell className="text-right">${detail.subtotal?.toFixed(2)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    
+                    <div className="flex justify-end mt-4">
+                      <div className="text-lg font-medium">
+                        Total: ${selectedSale.total?.toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </ScrollArea>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>Close</Button>
+              <Button variant="outline" onClick={() => {
+                setIsViewDialogOpen(false);
+                editSale(selectedSale!);
+              }} className="text-blue-500 hover:text-blue-600 hover:bg-blue-50">
+                <Edit className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Edit Sale Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden">
+            <DialogHeader>
+              <DialogTitle>Edit Sale</DialogTitle>
+              <DialogDescription>Update the details for transaction #{saleForm.transno}</DialogDescription>
+            </DialogHeader>
+            
+            <ScrollArea className="pr-4 max-h-[calc(90vh-10rem)]">
+              <div className="grid grid-cols-2 gap-4 py-4">
+                <div className="space-y-2">
+                  <label htmlFor="salesdate" className="text-sm font-medium">Sale Date</label>
+                  <Input 
+                    id="salesdate" 
+                    type="date" 
+                    value={saleForm.salesdate} 
+                    onChange={(e) => setSaleForm({...saleForm, salesdate: e.target.value})}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label htmlFor="custno" className="text-sm font-medium">Customer</label>
+                  <Select value={saleForm.custno} onValueChange={(value) => setSaleForm({...saleForm, custno: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select customer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customers.map((customer) => (
+                        <SelectItem key={customer.custno} value={customer.custno}>
+                          {customer.custname}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <label htmlFor="empno" className="text-sm font-medium">Employee</label>
+                  <Select value={saleForm.empno} onValueChange={(value) => setSaleForm({...saleForm, empno: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select employee" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {employees.map((employee) => (
+                        <SelectItem key={employee.empno} value={employee.empno}>
+                          {employee.firstname} {employee.lastname}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="space-y-4 mt-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-medium">Sale Details</h3>
+                  <Button type="button" size="sm" variant="outline" onClick={addDetailLine}>
+                    Add Product
+                  </Button>
+                </div>
+                
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Product</TableHead>
+                        <TableHead>Quantity</TableHead>
+                        <TableHead>Unit Price</TableHead>
+                        <TableHead>Subtotal</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {saleForm.details.map((detail, index) => (
+                        <TableRow key={index}>
+                          <TableCell>
+                            <Select 
+                              value={detail.prodcode} 
+                              onValueChange={(value) => updateDetailLine(index, 'prodcode', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select product" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {products.map((product) => (
+                                  <SelectItem key={product.prodcode} value={product.prodcode}>
+                                    {product.description} - ${product.currentPrice?.toFixed(2)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          
+                          <TableCell>
+                            <Input 
+                              type="number" 
+                              value={detail.quantity} 
+                              onChange={(e) => updateDetailLine(index, 'quantity', e.target.value)}
+                              min="1"
+                              className="w-20"
+                            />
+                          </TableCell>
+                          
+                          <TableCell>
+                            ${detail.unitPrice?.toFixed(2)}
+                          </TableCell>
+                          
+                          <TableCell>
+                            ${detail.subtotal?.toFixed(2)}
+                          </TableCell>
+                          
+                          <TableCell>
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon"
+                              disabled={saleForm.details.length <= 1}
+                              onClick={() => removeDetailLine(index)}
+                              className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                
+                <div className="flex justify-end text-lg font-medium">
+                  Total: ${saleForm.total?.toFixed(2)}
+                </div>
+              </div>
+            </ScrollArea>
+            
+            <DialogFooter className="mt-4">
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+              <Button onClick={updateSale}>Update Sale</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Delete Sale Dialog */}
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete the sale transaction #{selectedSale?.transno} and all its details. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={deleteSale} className="bg-red-500 hover:bg-red-600">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        
+        {/* Customer Receipt Dialog */}
+        <Dialog open={isReceiptDialogOpen} onOpenChange={setIsReceiptDialogOpen}>
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden">
+            <DialogHeader>
+              <DialogTitle className="flex items-center">
+                <ReceiptText className="mr-2 h-5 w-5 text-purple-500" />
+                Customer Receipt
+              </DialogTitle>
+              <DialogDescription>
+                All sales for {selectedCustomer?.custname} - Total: ${selectedCustomer?.totalSales.toFixed(2)}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="mb-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Search transactions..." 
+                  className="pl-10"
+                  value={customerSearchQuery}
+                  onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
+            
+            <ScrollArea className="pr-4 max-h-[calc(90vh-14rem)]">
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead>Transaction No</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Employee</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredCustomerSales.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                          {customerSearchQuery ? "No matching sales found. Try a different search." : "No sales records found for this customer."}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredCustomerSales.map((sale) => (
+                        <TableRow key={sale.transno} className="hover:bg-muted/30 transition-colors">
+                          <TableCell>{sale.transno}</TableCell>
+                          <TableCell>{new Date(sale.salesdate).toLocaleDateString()}</TableCell>
+                          <TableCell>{sale.employeeName}</TableCell>
+                          <TableCell className="text-right font-medium">
+                            ${Number(sale.total).toFixed(2)}
+                          </TableCell>
+                          <TableCell>
+                            <Button variant="outline" size="icon" onClick={() => {
+                              setIsReceiptDialogOpen(false);
+                              viewSaleDetails(sale);
+                            }} title="View Details">
+                              <ArrowRight className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </ScrollArea>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsReceiptDialogOpen(false)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </DashboardLayout>
+  );
+};
+
+export default SalesPage;
