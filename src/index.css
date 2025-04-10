@@ -93,6 +93,21 @@
   body {
     @apply bg-background text-foreground;
   }
+  
+  /* Improve label contrast in light and dark modes */
+  label {
+    @apply font-medium text-foreground;
+  }
+  
+  /* Improve table header contrast */
+  th {
+    @apply text-foreground font-semibold;
+  }
+  
+  /* Improve input text contrast */
+  input, select, textarea {
+    @apply text-foreground;
+  }
 }
 
 .auth-container {
