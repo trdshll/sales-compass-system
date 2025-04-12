@@ -85,6 +85,13 @@ const SelectContent = React.forwardRef<
     if (onSearch) {
       onSearch(value);
     }
+    // Prevent the select menu from closing when typing in the search box
+    e.stopPropagation();
+  };
+
+  // Prevent key events from bubbling up to the Select component
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    e.stopPropagation();
   };
 
   return (
@@ -110,6 +117,9 @@ const SelectContent = React.forwardRef<
                 className="pl-8"
                 value={searchValue}
                 onChange={handleSearchChange}
+                onKeyDown={handleKeyDown}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
               />
             </div>
           </div>

@@ -73,6 +73,13 @@ const DropdownMenuContent = React.forwardRef<
     if (onSearch) {
       onSearch(value);
     }
+    // Prevent the dropdown menu from closing when typing in the search box
+    e.stopPropagation();
+  };
+
+  // Prevent key events from bubbling up to the DropdownMenu component
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    e.stopPropagation();
   };
 
   return (
@@ -95,6 +102,9 @@ const DropdownMenuContent = React.forwardRef<
                 className="pl-8"
                 value={searchValue}
                 onChange={handleSearchChange}
+                onKeyDown={handleKeyDown}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
               />
             </div>
           </div>
