@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -103,6 +102,12 @@ const SalesPage = () => {
     details: [{ prodcode: '', quantity: 1, unitPrice: 0, subtotal: 0 }],
     total: 0
   });
+  
+  // New state for filtering dropdown options
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [nextTransactionNumber, setNextTransactionNumber] = useState<string>('');
   
   // Calculate total for the current form
   const calculateTotal = () => {
@@ -262,6 +267,43 @@ const SalesPage = () => {
     }
   };
   
+  // Get the next transaction number
+  const fetchNextTransactionNumber = async () => {
+    try {
+      // Get the latest transaction number from the database
+      const { data, error } = await supabase
+        .from('sales')
+        .select('transno')
+        .order('transno', { ascending: false })
+        .limit(1);
+        
+      if (error) throw error;
+      
+      let nextNumber = 'TR00001';
+      
+      if (data && data.length > 0) {
+        // Extract the numeric part of the transaction number
+        const lastTransactionNo = data[0].transno;
+        const numericPart = lastTransactionNo.replace(/^\D+/g, '');
+        
+        // Increment it and format back
+        const nextNumericPart = parseInt(numericPart, 10) + 1;
+        nextNumber = `TR${nextNumericPart.toString().padStart(5, '0')}`;
+      }
+      
+      setNextTransactionNumber(nextNumber);
+      setSaleForm(prev => ({ ...prev, transno: nextNumber }));
+      
+    } catch (error) {
+      console.error('Error fetching next transaction number:', error);
+      // Use a fallback pattern if we can't get it from the database
+      const timestamp = Date.now().toString();
+      const fallbackNumber = `TR${timestamp.substring(timestamp.length - 6)}`;
+      setNextTransactionNumber(fallbackNumber);
+      setSaleForm(prev => ({ ...prev, transno: fallbackNumber }));
+    }
+  };
+  
   // Load customers, employees, and products with prices
   const fetchReferenceData = async () => {
     try {
@@ -272,6 +314,7 @@ const SalesPage = () => {
         
       if (customersError) throw customersError;
       setCustomers(customersData || []);
+      setFilteredCustomers(customersData || []);
       
       // Get employees
       const { data: employeesData, error: employeesError } = await supabase
@@ -280,6 +323,7 @@ const SalesPage = () => {
         
       if (employeesError) throw employeesError;
       setEmployees(employeesData || []);
+      setFilteredEmployees(employeesData || []);
       
       // Get products with current prices
       const { data: productsData, error: productsError } = await supabase
@@ -304,6 +348,7 @@ const SalesPage = () => {
       }));
       
       setProducts(productsWithPrices);
+      setFilteredProducts(productsWithPrices);
     } catch (error) {
       console.error('Error fetching reference data:', error);
       toast({
@@ -312,6 +357,55 @@ const SalesPage = () => {
         description: "There was a problem loading the reference data.",
       });
     }
+  };
+  
+  // Search filter handlers
+  const handleCustomerSearch = (searchTerm: string) => {
+    if (!searchTerm.trim()) {
+      setFilteredCustomers(customers);
+      return;
+    }
+    
+    const term = searchTerm.toLowerCase();
+    const filtered = customers.filter(
+      customer => 
+        customer.custname.toLowerCase().includes(term) || 
+        customer.custno.toLowerCase().includes(term)
+    );
+    
+    setFilteredCustomers(filtered);
+  };
+  
+  const handleEmployeeSearch = (searchTerm: string) => {
+    if (!searchTerm.trim()) {
+      setFilteredEmployees(employees);
+      return;
+    }
+    
+    const term = searchTerm.toLowerCase();
+    const filtered = employees.filter(
+      employee => 
+        `${employee.firstname} ${employee.lastname}`.toLowerCase().includes(term) || 
+        employee.empno.toLowerCase().includes(term)
+    );
+    
+    setFilteredEmployees(filtered);
+  };
+  
+  const handleProductSearch = (searchTerm: string, index: number) => {
+    if (!searchTerm.trim()) {
+      setFilteredProducts(products);
+      return;
+    }
+    
+    const term = searchTerm.toLowerCase();
+    const filtered = products.filter(
+      product => 
+        product.description.toLowerCase().includes(term) || 
+        product.prodcode.toLowerCase().includes(term)
+    );
+    
+    setFilteredProducts(filtered);
   };
   
   // Load sale details for viewing
@@ -526,8 +620,9 @@ const SalesPage = () => {
   
   // Reset form to initial state
   const resetForm = () => {
+    // Keep the transaction number
     setSaleForm({
-      transno: '',
+      transno: nextTransactionNumber,
       salesdate: new Date().toISOString().split('T')[0],
       custno: '',
       empno: '',
@@ -600,12 +695,15 @@ const SalesPage = () => {
   // Initialize form for adding a new sale
   const initAddSaleForm = () => {
     resetForm();
+    // Make sure we have a fresh transaction number
+    fetchNextTransactionNumber();
     setIsAddDialogOpen(true);
   };
   
   useEffect(() => {
     fetchSales();
     fetchReferenceData();
+    fetchNextTransactionNumber();
   }, []);
   
   // Recalculate total whenever details change
@@ -787,8 +885,9 @@ const SalesPage = () => {
                   <Input 
                     id="transno" 
                     value={saleForm.transno} 
-                    onChange={(e) => setSaleForm({...saleForm, transno: e.target.value})}
-                    placeholder="Enter transaction number"
+                    readOnly
+                    disabled
+                    className="bg-gray-100"
                   />
                 </div>
                 
@@ -798,7 +897,9 @@ const SalesPage = () => {
                     id="salesdate" 
                     type="date" 
                     value={saleForm.salesdate} 
-                    onChange={(e) => setSaleForm({...saleForm, salesdate: e.target.value})}
+                    readOnly
+                    disabled
+                    className="bg-gray-100"
                   />
                 </div>
                 
@@ -808,8 +909,8 @@ const SalesPage = () => {
                     <SelectTrigger>
                       <SelectValue placeholder="Select customer" />
                     </SelectTrigger>
-                    <SelectContent>
-                      {customers.map((customer) => (
+                    <SelectContent showSearch onSearch={handleCustomerSearch}>
+                      {filteredCustomers.map((customer) => (
                         <SelectItem key={customer.custno} value={customer.custno}>
                           {customer.custname}
                         </SelectItem>
@@ -824,8 +925,8 @@ const SalesPage = () => {
                     <SelectTrigger>
                       <SelectValue placeholder="Select employee" />
                     </SelectTrigger>
-                    <SelectContent>
-                      {employees.map((employee) => (
+                    <SelectContent showSearch onSearch={handleEmployeeSearch}>
+                      {filteredEmployees.map((employee) => (
                         <SelectItem key={employee.empno} value={employee.empno}>
                           {employee.firstname} {employee.lastname}
                         </SelectItem>
@@ -865,8 +966,8 @@ const SalesPage = () => {
                               <SelectTrigger>
                                 <SelectValue placeholder="Select product" />
                               </SelectTrigger>
-                              <SelectContent>
-                                {products.map((product) => (
+                              <SelectContent showSearch onSearch={(value) => handleProductSearch(value, index)}>
+                                {filteredProducts.map((product) => (
                                   <SelectItem key={product.prodcode} value={product.prodcode}>
                                     {product.description} - ${product.currentPrice?.toFixed(2)}
                                   </SelectItem>
@@ -923,6 +1024,163 @@ const SalesPage = () => {
               </Button>
               <Button onClick={addSale}>
                 Create Sale
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Edit Sale Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden">
+            <DialogHeader>
+              <DialogTitle>Edit Sale</DialogTitle>
+              <DialogDescription>Update the details for transaction #{saleForm.transno}</DialogDescription>
+            </DialogHeader>
+            
+            <ScrollArea className="pr-4 max-h-[calc(90vh-10rem)]">
+              <div className="grid grid-cols-2 gap-4 py-4">
+                <div className="space-y-2">
+                  <label htmlFor="transno-edit" className="text-sm font-medium">Transaction Number</label>
+                  <Input 
+                    id="transno-edit" 
+                    value={saleForm.transno} 
+                    readOnly
+                    disabled
+                    className="bg-gray-100"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label htmlFor="salesdate-edit" className="text-sm font-medium">Sale Date</label>
+                  <Input 
+                    id="salesdate-edit" 
+                    type="date" 
+                    value={saleForm.salesdate} 
+                    onChange={(e) => setSaleForm({...saleForm, salesdate: e.target.value})}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label htmlFor="custno-edit" className="text-sm font-medium">Customer</label>
+                  <Select value={saleForm.custno} onValueChange={(value) => setSaleForm({...saleForm, custno: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select customer" />
+                    </SelectTrigger>
+                    <SelectContent showSearch onSearch={handleCustomerSearch}>
+                      {filteredCustomers.map((customer) => (
+                        <SelectItem key={customer.custno} value={customer.custno}>
+                          {customer.custname}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <label htmlFor="empno-edit" className="text-sm font-medium">Employee</label>
+                  <Select value={saleForm.empno} onValueChange={(value) => setSaleForm({...saleForm, empno: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select employee" />
+                    </SelectTrigger>
+                    <SelectContent showSearch onSearch={handleEmployeeSearch}>
+                      {filteredEmployees.map((employee) => (
+                        <SelectItem key={employee.empno} value={employee.empno}>
+                          {employee.firstname} {employee.lastname}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="space-y-4 mt-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-medium">Sale Details</h3>
+                  <Button type="button" size="sm" variant="outline" onClick={addDetailLine}>
+                    Add Product
+                  </Button>
+                </div>
+                
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Product</TableHead>
+                        <TableHead>Quantity</TableHead>
+                        <TableHead>Unit Price</TableHead>
+                        <TableHead>Subtotal</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {saleForm.details.map((detail, index) => (
+                        <TableRow key={index}>
+                          <TableCell>
+                            <Select 
+                              value={detail.prodcode} 
+                              onValueChange={(value) => updateDetailLine(index, 'prodcode', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select product" />
+                              </SelectTrigger>
+                              <SelectContent showSearch onSearch={(value) => handleProductSearch(value, index)}>
+                                {filteredProducts.map((product) => (
+                                  <SelectItem key={product.prodcode} value={product.prodcode}>
+                                    {product.description} - ${product.currentPrice?.toFixed(2)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          
+                          <TableCell>
+                            <Input 
+                              type="number" 
+                              value={detail.quantity} 
+                              onChange={(e) => updateDetailLine(index, 'quantity', e.target.value)}
+                              min="1"
+                              className="w-20"
+                            />
+                          </TableCell>
+                          
+                          <TableCell>
+                            ${detail.unitPrice?.toFixed(2)}
+                          </TableCell>
+                          
+                          <TableCell>
+                            ${detail.subtotal?.toFixed(2)}
+                          </TableCell>
+                          
+                          <TableCell>
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon"
+                              disabled={saleForm.details.length <= 1}
+                              onClick={() => removeDetailLine(index)}
+                              className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                
+                <div className="flex justify-end text-lg font-medium">
+                  Total: ${saleForm.total?.toFixed(2)}
+                </div>
+              </div>
+            </ScrollArea>
+            
+            <DialogFooter className="mt-4">
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={updateSale}>
+                Update Sale
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -992,152 +1250,6 @@ const SalesPage = () => {
               </Button>
               <Button onClick={() => { setIsViewDialogOpen(false); editSale(selectedSale!); }}>
                 Edit Sale
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-        
-        {/* Edit Sale Dialog */}
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden">
-            <DialogHeader>
-              <DialogTitle>Edit Sale</DialogTitle>
-              <DialogDescription>Update the details for transaction #{saleForm.transno}</DialogDescription>
-            </DialogHeader>
-            
-            <ScrollArea className="pr-4 max-h-[calc(90vh-10rem)]">
-              <div className="grid grid-cols-2 gap-4 py-4">
-                <div className="space-y-2">
-                  <label htmlFor="salesdate" className="text-sm font-medium">Sale Date</label>
-                  <Input 
-                    id="salesdate" 
-                    type="date" 
-                    value={saleForm.salesdate} 
-                    onChange={(e) => setSaleForm({...saleForm, salesdate: e.target.value})}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <label htmlFor="custno" className="text-sm font-medium">Customer</label>
-                  <Select value={saleForm.custno} onValueChange={(value) => setSaleForm({...saleForm, custno: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {customers.map((customer) => (
-                        <SelectItem key={customer.custno} value={customer.custno}>
-                          {customer.custname}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <label htmlFor="empno" className="text-sm font-medium">Employee</label>
-                  <Select value={saleForm.empno} onValueChange={(value) => setSaleForm({...saleForm, empno: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select employee" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {employees.map((employee) => (
-                        <SelectItem key={employee.empno} value={employee.empno}>
-                          {employee.firstname} {employee.lastname}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <div className="space-y-4 mt-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-medium">Sale Details</h3>
-                  <Button type="button" size="sm" variant="outline" onClick={addDetailLine}>
-                    Add Product
-                  </Button>
-                </div>
-                
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Product</TableHead>
-                        <TableHead>Quantity</TableHead>
-                        <TableHead>Unit Price</TableHead>
-                        <TableHead>Subtotal</TableHead>
-                        <TableHead></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {saleForm.details.map((detail, index) => (
-                        <TableRow key={index}>
-                          <TableCell>
-                            <Select 
-                              value={detail.prodcode} 
-                              onValueChange={(value) => updateDetailLine(index, 'prodcode', value)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select product" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {products.map((product) => (
-                                  <SelectItem key={product.prodcode} value={product.prodcode}>
-                                    {product.description} - ${product.currentPrice?.toFixed(2)}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          
-                          <TableCell>
-                            <Input 
-                              type="number" 
-                              value={detail.quantity} 
-                              onChange={(e) => updateDetailLine(index, 'quantity', e.target.value)}
-                              min="1"
-                              className="w-20"
-                            />
-                          </TableCell>
-                          
-                          <TableCell>
-                            ${detail.unitPrice?.toFixed(2)}
-                          </TableCell>
-                          
-                          <TableCell>
-                            ${detail.subtotal?.toFixed(2)}
-                          </TableCell>
-                          
-                          <TableCell>
-                            <Button 
-                              type="button" 
-                              variant="ghost" 
-                              size="icon"
-                              disabled={saleForm.details.length <= 1}
-                              onClick={() => removeDetailLine(index)}
-                              className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-                
-                <div className="flex justify-end text-lg font-medium">
-                  Total: ${saleForm.total?.toFixed(2)}
-                </div>
-              </div>
-            </ScrollArea>
-            
-            <DialogFooter className="mt-4">
-              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={updateSale}>
-                Update Sale
               </Button>
             </DialogFooter>
           </DialogContent>
