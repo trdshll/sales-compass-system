@@ -359,7 +359,7 @@ const SalesPage = () => {
     }
   };
   
-  // Search filter handlers
+  // Enhanced search filter handlers that search by both ID and name
   const handleCustomerSearch = (searchTerm: string) => {
     if (!searchTerm.trim()) {
       setFilteredCustomers(customers);
@@ -909,10 +909,10 @@ const SalesPage = () => {
                     <SelectTrigger>
                       <SelectValue placeholder="Select customer" />
                     </SelectTrigger>
-                    <SelectContent showSearch onSearch={handleCustomerSearch}>
+                    <SelectContent showSearch onSearch={handleCustomerSearch} searchPlaceholder="Search name or customer #">
                       {filteredCustomers.map((customer) => (
                         <SelectItem key={customer.custno} value={customer.custno}>
-                          {customer.custname}
+                          {customer.custname} ({customer.custno})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -925,10 +925,10 @@ const SalesPage = () => {
                     <SelectTrigger>
                       <SelectValue placeholder="Select employee" />
                     </SelectTrigger>
-                    <SelectContent showSearch onSearch={handleEmployeeSearch}>
+                    <SelectContent showSearch onSearch={handleEmployeeSearch} searchPlaceholder="Search name or employee #">
                       {filteredEmployees.map((employee) => (
                         <SelectItem key={employee.empno} value={employee.empno}>
-                          {employee.firstname} {employee.lastname}
+                          {employee.firstname} {employee.lastname} ({employee.empno})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -966,10 +966,10 @@ const SalesPage = () => {
                               <SelectTrigger>
                                 <SelectValue placeholder="Select product" />
                               </SelectTrigger>
-                              <SelectContent showSearch onSearch={(value) => handleProductSearch(value, index)}>
+                              <SelectContent showSearch onSearch={(value) => handleProductSearch(value, index)} searchPlaceholder="Search name or product #">
                                 {filteredProducts.map((product) => (
                                   <SelectItem key={product.prodcode} value={product.prodcode}>
-                                    {product.description} - ${product.currentPrice?.toFixed(2)}
+                                    {product.description} ({product.prodcode}) - ${product.currentPrice?.toFixed(2)}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -1066,10 +1066,10 @@ const SalesPage = () => {
                     <SelectTrigger>
                       <SelectValue placeholder="Select customer" />
                     </SelectTrigger>
-                    <SelectContent showSearch onSearch={handleCustomerSearch}>
+                    <SelectContent showSearch onSearch={handleCustomerSearch} searchPlaceholder="Search name or customer #">
                       {filteredCustomers.map((customer) => (
                         <SelectItem key={customer.custno} value={customer.custno}>
-                          {customer.custname}
+                          {customer.custname} ({customer.custno})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1082,10 +1082,10 @@ const SalesPage = () => {
                     <SelectTrigger>
                       <SelectValue placeholder="Select employee" />
                     </SelectTrigger>
-                    <SelectContent showSearch onSearch={handleEmployeeSearch}>
+                    <SelectContent showSearch onSearch={handleEmployeeSearch} searchPlaceholder="Search name or employee #">
                       {filteredEmployees.map((employee) => (
                         <SelectItem key={employee.empno} value={employee.empno}>
-                          {employee.firstname} {employee.lastname}
+                          {employee.firstname} {employee.lastname} ({employee.empno})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1123,10 +1123,10 @@ const SalesPage = () => {
                               <SelectTrigger>
                                 <SelectValue placeholder="Select product" />
                               </SelectTrigger>
-                              <SelectContent showSearch onSearch={(value) => handleProductSearch(value, index)}>
+                              <SelectContent showSearch onSearch={(value) => handleProductSearch(value, index)} searchPlaceholder="Search name or product #">
                                 {filteredProducts.map((product) => (
                                   <SelectItem key={product.prodcode} value={product.prodcode}>
-                                    {product.description} - ${product.currentPrice?.toFixed(2)}
+                                    {product.description} ({product.prodcode}) - ${product.currentPrice?.toFixed(2)}
                                   </SelectItem>
                                 ))}
                               </SelectContent>

@@ -71,12 +71,13 @@ SelectScrollDownButton.displayName =
 interface SelectContentProps extends React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> {
   showSearch?: boolean;
   onSearch?: (value: string) => void;
+  searchPlaceholder?: string;
 }
 
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   SelectContentProps
->(({ className, children, showSearch, onSearch, position = "popper", ...props }, ref) => {
+>(({ className, children, showSearch, onSearch, searchPlaceholder = "Search...", position = "popper", ...props }, ref) => {
   const [searchValue, setSearchValue] = React.useState("");
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -109,11 +110,11 @@ const SelectContent = React.forwardRef<
       >
         <SelectScrollUpButton />
         {showSearch && (
-          <div className="px-2 py-2 sticky top-0 bg-popover border-b">
+          <div className="px-2 py-2 sticky top-0 bg-popover border-b z-10">
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search..."
+                placeholder={searchPlaceholder}
                 className="pl-8"
                 value={searchValue}
                 onChange={handleSearchChange}
