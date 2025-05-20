@@ -11,9 +11,10 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { PlusCircle, Edit, Trash2, ArrowRight, ReceiptText, Users, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, ArrowRight, ReceiptText, Users, Search, ChevronDown, ChevronUp, Shield } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
+import { Textarea } from "@/components/ui/textarea";
 
 // Define types for our data
 interface Customer {
@@ -50,6 +51,7 @@ interface Sale {
   employeeName?: string;
   details?: SalesDetail[];
   total?: number;
+  isDeleted?: boolean;
 }
 
 interface CustomerSummary {
@@ -57,6 +59,15 @@ interface CustomerSummary {
   custname: string;
   totalSales: number;
   saleCount: number;
+}
+
+interface AdminInfo {
+  isAdmin: boolean;
+  loaded: boolean;
+}
+
+interface DeletionReason {
+  reason: string;
 }
 
 const SalesPage = () => {
@@ -103,65 +114,56 @@ const SalesPage = () => {
     total: 0
   });
   
-  // New state for filtering dropdown options
-  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
-  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [nextTransactionNumber, setNextTransactionNumber] = useState<string>('');
+  // New state variables for admin features
+  const [adminInfo, setAdminInfo] = useState<AdminInfo>({ isAdmin: false, loaded: false });
+  const [isDeleteReasonDialogOpen, setIsDeleteReasonDialogOpen] = useState(false);
+  const [deleteReason, setDeleteReason] = useState<DeletionReason>({ reason: '' });
+  const [deletedSales, setDeletedSales] = useState<Sale[]>([]);
+  const [isShowDeletedToggled, setIsShowDeletedToggled] = useState(false);
+  const [showDeletedSwitchVisible, setShowDeletedSwitchVisible] = useState(false);
   
-  // Calculate total for the current form
-  const calculateTotal = () => {
-    const total = saleForm.details.reduce((sum, detail) => sum + (detail.subtotal || 0), 0);
-    setSaleForm(prev => ({ ...prev, total }));
-    return total;
+  // Check if the current user is an admin
+  const checkAdminStatus = async () => {
+    if (!user) {
+      setAdminInfo({ isAdmin: false, loaded: true });
+      return;
+    }
+    
+    try {
+      const { data: roleData, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+        
+      if (error) {
+        console.error('Error checking admin status:', error);
+        setAdminInfo({ isAdmin: false, loaded: true });
+        return;
+      }
+      
+      setAdminInfo({ 
+        isAdmin: roleData?.role === 'admin', 
+        loaded: true 
+      });
+      
+      // Only show the deleted sales toggle if user is admin
+      setShowDeletedSwitchVisible(roleData?.role === 'admin');
+    } catch (error) {
+      console.error('Error in admin check:', error);
+      setAdminInfo({ isAdmin: false, loaded: true });
+    }
   };
-
-  // Filter sales based on search query
-  useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setFilteredSales(sales);
-    } else {
-      const query = searchQuery.toLowerCase();
-      const filtered = sales.filter(sale => 
-        sale.transno.toLowerCase().includes(query) ||
-        sale.customerName?.toLowerCase().includes(query) ||
-        sale.employeeName?.toLowerCase().includes(query) ||
-        new Date(sale.salesdate).toLocaleDateString().includes(query) ||
-        String(sale.total).includes(query)
-      );
-      setFilteredSales(filtered);
-    }
-  }, [searchQuery, sales]);
-
-  // Filter customer sales based on search query
-  useEffect(() => {
-    if (customerSearchQuery.trim() === '') {
-      setFilteredCustomerSales(customerSales);
-    } else {
-      const query = customerSearchQuery.toLowerCase();
-      const filtered = customerSales.filter(sale => 
-        sale.transno.toLowerCase().includes(query) ||
-        new Date(sale.salesdate).toLocaleDateString().includes(query) ||
-        sale.employeeName?.toLowerCase().includes(query) ||
-        String(sale.total).includes(query)
-      );
-      setFilteredCustomerSales(filtered);
-    }
-  }, [customerSearchQuery, customerSales]);
-
-  // Filter and limit customer summaries to display
-  useEffect(() => {
-    // Show all customer summaries for now, we'll only limit the display in UI
-    setDisplayedCustomerSummaries(customerSummaries);
-  }, [customerSummaries]);
   
-  // Load sales data
+  // Load sales data with consideration for soft deletes
   const fetchSales = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('sales')
-        .select('*')
-        .order('salesdate', { ascending: false });
+        .select('*');
+        
+      // Admin users can see both deleted and non-deleted records
+      const { data, error } = await query.order('salesdate', { ascending: false });
         
       if (error) throw error;
       
@@ -231,17 +233,23 @@ const SalesPage = () => {
           customerName,
           employeeName,
           details,
-          total
+          total,
+          isDeleted: sale.deleted_at !== null
         };
       }));
       
-      setSales(salesWithNames);
-      setFilteredSales(salesWithNames);
+      // Separate active and deleted sales
+      const activeSales = salesWithNames.filter(sale => !sale.isDeleted);
+      const softDeletedSales = salesWithNames.filter(sale => sale.isDeleted);
+      
+      setSales(activeSales);
+      setDeletedSales(softDeletedSales);
+      setFilteredSales(activeSales);
       
       // Calculate customer summaries
       const summaries: Record<string, CustomerSummary> = {};
       
-      for (const sale of salesWithNames) {
+      for (const sale of activeSales) {
         if (!summaries[sale.custno]) {
           summaries[sale.custno] = {
             custno: sale.custno,
@@ -291,7 +299,6 @@ const SalesPage = () => {
         nextNumber = `TR${nextNumericPart.toString().padStart(5, '0')}`;
       }
       
-      setNextTransactionNumber(nextNumber);
       setSaleForm(prev => ({ ...prev, transno: nextNumber }));
       
     } catch (error) {
@@ -299,7 +306,6 @@ const SalesPage = () => {
       // Use a fallback pattern if we can't get it from the database
       const timestamp = Date.now().toString();
       const fallbackNumber = `TR${timestamp.substring(timestamp.length - 6)}`;
-      setNextTransactionNumber(fallbackNumber);
       setSaleForm(prev => ({ ...prev, transno: fallbackNumber }));
     }
   };
@@ -314,7 +320,6 @@ const SalesPage = () => {
         
       if (customersError) throw customersError;
       setCustomers(customersData || []);
-      setFilteredCustomers(customersData || []);
       
       // Get employees
       const { data: employeesData, error: employeesError } = await supabase
@@ -323,7 +328,6 @@ const SalesPage = () => {
         
       if (employeesError) throw employeesError;
       setEmployees(employeesData || []);
-      setFilteredEmployees(employeesData || []);
       
       // Get products with current prices
       const { data: productsData, error: productsError } = await supabase
@@ -348,7 +352,6 @@ const SalesPage = () => {
       }));
       
       setProducts(productsWithPrices);
-      setFilteredProducts(productsWithPrices);
     } catch (error) {
       console.error('Error fetching reference data:', error);
       toast({
@@ -469,8 +472,17 @@ const SalesPage = () => {
   
   // Set up sale for deletion
   const confirmDeleteSale = (sale: Sale) => {
+    if (!adminInfo.isAdmin) {
+      toast({
+        variant: "destructive",
+        title: "Permission Denied",
+        description: "Only administrators can delete sales records.",
+      });
+      return;
+    }
+    
     setSelectedSale(sale);
-    setIsDeleteDialogOpen(true);
+    setIsDeleteReasonDialogOpen(true);
   };
   
   // Delete sale
@@ -478,28 +490,76 @@ const SalesPage = () => {
     if (!selectedSale) return;
     
     try {
-      // First delete all related sales details
+      if (!adminInfo.isAdmin) {
+        toast({
+          variant: "destructive",
+          title: "Permission Denied",
+          description: "Only administrators can delete sales records.",
+        });
+        setIsDeleteDialogOpen(false);
+        return;
+      }
+      
+      // Get current admin name
+      const { data: profile } = await supabase.auth.getUser();
+      const adminName = profile?.user?.email || 'Unknown Admin';
+      
+      // Create a transaction ID for this deletion
+      const transactionId = `DEL-${Date.now()}-${selectedSale.transno}`;
+      
+      // First soft delete all related sales details
       const { error: detailsError } = await supabase
         .from('salesdetail')
-        .delete()
+        .update({
+          deleted_at: new Date().toISOString(),
+          deleted_by: user?.id
+        })
         .eq('transno', selectedSale.transno);
         
       if (detailsError) throw detailsError;
       
-      // Then delete the sale
+      // Then soft delete the sale
       const { error: saleError } = await supabase
         .from('sales')
-        .delete()
+        .update({
+          deleted_at: new Date().toISOString(),
+          deleted_by: user?.id,
+          delete_reason: deleteReason.reason
+        })
         .eq('transno', selectedSale.transno);
         
       if (saleError) throw saleError;
       
+      // Log the deletion
+      const { error: logError } = await supabase
+        .from('deletion_logs')
+        .insert([
+          {
+            table_name: 'sales',
+            record_id: selectedSale.transno,
+            transaction_id: transactionId,
+            deleted_by: user?.id,
+            admin_name: adminName,
+            reason: deleteReason.reason,
+            metadata: JSON.stringify({
+              salesDate: selectedSale.salesdate,
+              customer: selectedSale.customerName,
+              employee: selectedSale.employeeName,
+              total: selectedSale.total
+            })
+          }
+        ]);
+        
+      if (logError) throw logError;
+      
       toast({
         title: "Sale deleted",
-        description: `Transaction #${selectedSale.transno} has been deleted successfully.`
+        description: `Transaction #${selectedSale.transno} has been soft-deleted successfully.`
       });
       
       setIsDeleteDialogOpen(false);
+      setIsDeleteReasonDialogOpen(false);
+      setDeleteReason({ reason: '' });
       fetchSales();
     } catch (error) {
       console.error('Error deleting sale:', error);
@@ -511,194 +571,36 @@ const SalesPage = () => {
     }
   };
   
-  // Add a new sale
-  const addSale = async () => {
-    try {
-      // First insert the sales record
-      const { data: salesData, error: salesError } = await supabase
-        .from('sales')
-        .insert([
-          {
-            transno: saleForm.transno,
-            salesdate: saleForm.salesdate,
-            custno: saleForm.custno,
-            empno: saleForm.empno
-          }
-        ])
-        .select();
-      
-      if (salesError) throw salesError;
-      
-      // Then insert the sales details
-      const salesDetails = saleForm.details.map(detail => ({
-        transno: saleForm.transno,
-        prodcode: detail.prodcode,
-        quantity: detail.quantity
-      }));
-      
-      const { error: detailsError } = await supabase
-        .from('salesdetail')
-        .insert(salesDetails);
-      
-      if (detailsError) throw detailsError;
-      
-      toast({
-        title: "Sale created",
-        description: `Transaction #${saleForm.transno} has been created successfully.`,
-      });
-      
-      // Reset form and reload data
-      resetForm();
-      setIsAddDialogOpen(false);
-      fetchSales();
-    } catch (error) {
-      console.error('Error adding sale:', error);
+  // New function to toggle between showing active and deleted sales
+  const toggleShowDeleted = () => {
+    if (isShowDeletedToggled) {
+      setFilteredSales(sales);
+    } else {
+      setFilteredSales(deletedSales);
+    }
+    setIsShowDeletedToggled(!isShowDeletedToggled);
+  };
+  
+  // New function to proceed with deletion after reason is provided
+  const proceedWithDeletion = () => {
+    if (deleteReason.reason.trim() === '') {
       toast({
         variant: "destructive",
-        title: "Error creating sale",
-        description: "There was a problem creating the sale record.",
+        title: "Reason Required",
+        description: "Please provide a reason for the deletion."
       });
-    }
-  };
-  
-  // Update an existing sale
-  const updateSale = async () => {
-    if (!selectedSale) return;
-    
-    try {
-      // Update the sales record
-      const { error: salesError } = await supabase
-        .from('sales')
-        .update({
-          salesdate: saleForm.salesdate,
-          custno: saleForm.custno,
-          empno: saleForm.empno
-        })
-        .eq('transno', saleForm.transno);
-      
-      if (salesError) throw salesError;
-      
-      // Delete existing details and insert new ones
-      const { error: deleteError } = await supabase
-        .from('salesdetail')
-        .delete()
-        .eq('transno', saleForm.transno);
-        
-      if (deleteError) throw deleteError;
-      
-      // Insert updated details
-      const salesDetails = saleForm.details.map(detail => ({
-        transno: saleForm.transno,
-        prodcode: detail.prodcode,
-        quantity: detail.quantity
-      }));
-      
-      const { error: detailsError } = await supabase
-        .from('salesdetail')
-        .insert(salesDetails);
-      
-      if (detailsError) throw detailsError;
-      
-      toast({
-        title: "Sale updated",
-        description: `Transaction #${saleForm.transno} has been updated successfully.`,
-      });
-      
-      // Reset form and reload data
-      resetForm();
-      setIsEditDialogOpen(false);
-      fetchSales();
-    } catch (error) {
-      console.error('Error updating sale:', error);
-      toast({
-        variant: "destructive",
-        title: "Error updating sale",
-        description: "There was a problem updating the sale record.",
-      });
-    }
-  };
-  
-  // Reset form to initial state
-  const resetForm = () => {
-    // Keep the transaction number
-    setSaleForm({
-      transno: nextTransactionNumber,
-      salesdate: new Date().toISOString().split('T')[0],
-      custno: '',
-      empno: '',
-      details: [{ prodcode: '', quantity: 1, unitPrice: 0, subtotal: 0 }],
-      total: 0
-    });
-  };
-  
-  // Add a new detail line to the sale
-  const addDetailLine = () => {
-    setSaleForm({
-      ...saleForm,
-      details: [...saleForm.details, { prodcode: '', quantity: 1, unitPrice: 0, subtotal: 0 }]
-    });
-  };
-  
-  // Update sale detail line
-  const updateDetailLine = (index: number, field: string, value: string | number) => {
-    const updatedDetails = [...saleForm.details];
-    
-    if (field === 'prodcode') {
-      const prodcode = value as string;
-      const product = products.find(p => p.prodcode === prodcode);
-      const unitPrice = product?.currentPrice || 0;
-      const quantity = updatedDetails[index].quantity;
-      
-      updatedDetails[index] = {
-        ...updatedDetails[index],
-        prodcode,
-        unitPrice,
-        subtotal: quantity * unitPrice
-      };
-    } else if (field === 'quantity') {
-      // Convert string to number
-      const quantity = typeof value === 'string' ? parseInt(value, 10) : value;
-      const unitPrice = updatedDetails[index].unitPrice;
-      
-      updatedDetails[index] = {
-        ...updatedDetails[index],
-        quantity,
-        subtotal: quantity * unitPrice
-      };
+      return;
     }
     
-    setSaleForm({
-      ...saleForm,
-      details: updatedDetails
-    });
-    
-    // Update total after a brief delay to ensure state has updated
-    setTimeout(calculateTotal, 0);
+    setIsDeleteReasonDialogOpen(false);
+    setIsDeleteDialogOpen(true);
   };
   
-  // Remove a detail line
-  const removeDetailLine = (index: number) => {
-    if (saleForm.details.length > 1) {
-      const updatedDetails = [...saleForm.details];
-      updatedDetails.splice(index, 1);
-      
-      setSaleForm({
-        ...saleForm,
-        details: updatedDetails
-      });
-      
-      // Update total after a brief delay
-      setTimeout(calculateTotal, 0);
+  useEffect(() => {
+    if (user) {
+      checkAdminStatus();
     }
-  };
-  
-  // Initialize form for adding a new sale
-  const initAddSaleForm = () => {
-    resetForm();
-    // Make sure we have a fresh transaction number
-    fetchNextTransactionNumber();
-    setIsAddDialogOpen(true);
-  };
+  }, [user]);
   
   useEffect(() => {
     fetchSales();
@@ -706,20 +608,36 @@ const SalesPage = () => {
     fetchNextTransactionNumber();
   }, []);
   
-  // Recalculate total whenever details change
-  useEffect(() => {
-    calculateTotal();
-  }, [saleForm.details]);
-  
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Sales Transactions</h1>
-          <Button onClick={initAddSaleForm} className="bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            New Sale
-          </Button>
+          <div className="flex items-center space-x-2">
+            {showDeletedSwitchVisible && (
+              <Button 
+                onClick={toggleShowDeleted}
+                variant="outline"
+                className={isShowDeletedToggled ? "bg-red-100 text-red-700 border-red-300" : ""}
+              >
+                {isShowDeletedToggled ? (
+                  <>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Showing Deleted
+                  </>
+                ) : (
+                  <>
+                    <Shield className="mr-2 h-4 w-4" />
+                    Show Deleted
+                  </>
+                )}
+              </Button>
+            )}
+            <Button onClick={() => setIsAddDialogOpen(true)} className="bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              New Sale
+            </Button>
+          </div>
         </div>
         
         {/* Customer Summaries */}
@@ -798,10 +716,21 @@ const SalesPage = () => {
         </div>
         
         {/* Sales Transactions Table */}
-        <Card className="shadow-md border-t-4 border-blue-500">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700">
-            <CardTitle>Recent Sales</CardTitle>
-            <CardDescription>View and manage your sales transactions</CardDescription>
+        <Card className={`shadow-md border-t-4 ${isShowDeletedToggled ? 'border-red-500' : 'border-blue-500'}`}>
+          <CardHeader className={`bg-gradient-to-r ${isShowDeletedToggled ? 'from-red-50 to-pink-50 dark:from-gray-800 dark:to-gray-700' : 'from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700'}`}>
+            <CardTitle>
+              {isShowDeletedToggled ? 'Deleted Sales Records' : 'Recent Sales'}
+              {isShowDeletedToggled && adminInfo.isAdmin && (
+                <span className="ml-2 px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full">
+                  Admin View
+                </span>
+              )}
+            </CardTitle>
+            <CardDescription>
+              {isShowDeletedToggled 
+                ? 'View previously deleted sales transactions' 
+                : 'View and manage your sales transactions'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="mb-4">
@@ -834,13 +763,24 @@ const SalesPage = () => {
                     {filteredSales.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                          {searchQuery ? "No matching sales found. Try a different search." : "No sales records found. Create your first sale by clicking \"New Sale\"."}
+                          {isShowDeletedToggled 
+                            ? "No deleted sales records found." 
+                            : searchQuery 
+                              ? "No matching sales found. Try a different search." 
+                              : "No sales records found. Create your first sale by clicking \"New Sale\"."}
                         </TableCell>
                       </TableRow>
                     ) : (
                       filteredSales.slice(0, 25).map((sale) => (
-                        <TableRow key={sale.transno} className="hover:bg-muted/30 transition-colors">
-                          <TableCell>{sale.transno}</TableCell>
+                        <TableRow key={sale.transno} className={`hover:bg-muted/30 transition-colors ${sale.isDeleted ? 'bg-red-50/30' : ''}`}>
+                          <TableCell>
+                            {sale.transno}
+                            {sale.isDeleted && (
+                              <span className="ml-2 px-1.5 py-0.5 text-xs bg-red-100 text-red-700 rounded">
+                                Deleted
+                              </span>
+                            )}
+                          </TableCell>
                           <TableCell>{new Date(sale.salesdate).toLocaleDateString()}</TableCell>
                           <TableCell>{sale.customerName}</TableCell>
                           <TableCell>{sale.employeeName}</TableCell>
@@ -852,12 +792,16 @@ const SalesPage = () => {
                               <Button variant="outline" size="icon" onClick={() => viewSaleDetails(sale)} title="View Details">
                                 <ArrowRight className="h-4 w-4" />
                               </Button>
-                              <Button variant="outline" size="icon" className="text-blue-500 hover:text-blue-600" onClick={() => editSale(sale)} title="Edit Sale">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button variant="outline" size="icon" className="text-red-500 hover:text-red-600" onClick={() => confirmDeleteSale(sale)} title="Delete Sale">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              {!sale.isDeleted && (
+                                <>
+                                  <Button variant="outline" size="icon" className="text-blue-500 hover:text-blue-600" onClick={() => editSale(sale)} title="Edit Sale">
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="outline" size="icon" className="text-red-500 hover:text-red-600" onClick={() => confirmDeleteSale(sale)} title="Delete Sale">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -1261,7 +1205,7 @@ const SalesPage = () => {
             <AlertDialogHeader>
               <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete transaction #{selectedSale?.transno}? This action cannot be undone.
+                Are you sure you want to delete transaction #{selectedSale?.transno}? This action will soft-delete the record.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -1274,6 +1218,46 @@ const SalesPage = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        
+        {/* Delete Reason Dialog */}
+        <Dialog open={isDeleteReasonDialogOpen} onOpenChange={setIsDeleteReasonDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Provide Deletion Reason</DialogTitle>
+              <DialogDescription>
+                As an administrator, you must provide a reason for deleting transaction #{selectedSale?.transno}.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <label htmlFor="delete-reason" className="text-sm font-medium">
+                  Reason for Deletion
+                </label>
+                <Textarea 
+                  id="delete-reason" 
+                  placeholder="Enter the reason for deleting this transaction..."
+                  value={deleteReason.reason}
+                  onChange={(e) => setDeleteReason({ reason: e.target.value })}
+                  className="min-h-[100px]"
+                />
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDeleteReasonDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={proceedWithDeletion}
+                disabled={deleteReason.reason.trim() === ''}
+              >
+                Proceed
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         
         {/* Customer Receipt Dialog */}
         <Dialog open={isReceiptDialogOpen} onOpenChange={setIsReceiptDialogOpen}>

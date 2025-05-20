@@ -30,6 +30,42 @@ export type Database = {
         }
         Relationships: []
       }
+      deletion_logs: {
+        Row: {
+          admin_name: string | null
+          deleted_at: string
+          deleted_by: string
+          id: string
+          metadata: Json | null
+          reason: string | null
+          record_id: string
+          table_name: string
+          transaction_id: string
+        }
+        Insert: {
+          admin_name?: string | null
+          deleted_at?: string
+          deleted_by: string
+          id?: string
+          metadata?: Json | null
+          reason?: string | null
+          record_id: string
+          table_name: string
+          transaction_id: string
+        }
+        Update: {
+          admin_name?: string | null
+          deleted_at?: string
+          deleted_by?: string
+          id?: string
+          metadata?: Json | null
+          reason?: string | null
+          record_id?: string
+          table_name?: string
+          transaction_id?: string
+        }
+        Relationships: []
+      }
       department: {
         Row: {
           deptcode: string
@@ -212,18 +248,27 @@ export type Database = {
       sales: {
         Row: {
           custno: string | null
+          delete_reason: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           empno: string | null
           salesdate: string | null
           transno: string
         }
         Insert: {
           custno?: string | null
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           empno?: string | null
           salesdate?: string | null
           transno: string
         }
         Update: {
           custno?: string | null
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           empno?: string | null
           salesdate?: string | null
           transno?: string
@@ -247,16 +292,22 @@ export type Database = {
       }
       salesdetail: {
         Row: {
+          deleted_at: string | null
+          deleted_by: string | null
           prodcode: string
           quantity: number | null
           transno: string
         }
         Insert: {
+          deleted_at?: string | null
+          deleted_by?: string | null
           prodcode: string
           quantity?: number | null
           transno: string
         }
         Update: {
+          deleted_at?: string | null
+          deleted_by?: string | null
           prodcode?: string
           quantity?: number | null
           transno?: string
@@ -278,15 +329,39 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["user_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["user_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["user_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: {
+        Args: { user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      user_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -401,6 +476,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      user_role: ["admin", "user"],
+    },
   },
 } as const
