@@ -18,6 +18,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  isAdmin: boolean;
+  checkAdminStatus: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,8 +36,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  const checkAdminStatus = async () => {
+    if (!user) return false;
+    
+    try {
+      const { data, error } = await supabase
+        .rpc('is_admin', { user_id: user.id });
+        
+      if (error) throw error;
+      
+      setIsAdmin(!!data);
+      return !!data;
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      return false;
+    }
+  };
 
   useEffect(() => {
     // Set up auth state listener
@@ -52,8 +72,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             email: email || '',
             name,
           });
+          
+          // Check admin status whenever auth state changes
+          setTimeout(() => {
+            if (session?.user) {
+              checkAdminStatus();
+            }
+          }, 0);
         } else {
           setUser(null);
+          setIsAdmin(false);
         }
       }
     );
@@ -71,6 +99,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           email: email || '',
           name,
         });
+        
+        // Check admin status on initial load
+        setTimeout(() => {
+          if (session?.user) {
+            checkAdminStatus();
+          }
+        }, 0);
       }
       setLoading(false);
     });
@@ -147,6 +182,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (error) throw error;
       
       setUser(null);
+      setIsAdmin(false);
       
       toast({
         title: "Logged out",
@@ -170,6 +206,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     login,
     logout,
     isAuthenticated: !!user,
+    isAdmin,
+    checkAdminStatus,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

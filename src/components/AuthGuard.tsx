@@ -6,24 +6,40 @@ import { useAuth } from '@/contexts/AuthContext';
 interface AuthGuardProps {
   children: ReactNode;
   requireAuth?: boolean;
+  adminOnly?: boolean;
 }
 
-const AuthGuard = ({ children, requireAuth = true }: AuthGuardProps) => {
-  const { isAuthenticated, loading } = useAuth();
+const AuthGuard = ({ children, requireAuth = true, adminOnly = false }: AuthGuardProps) => {
+  const { isAuthenticated, loading, isAdmin, checkAdminStatus } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    // If we need admin privileges, check admin status
+    if (requireAuth && adminOnly) {
+      checkAdminStatus();
+    }
+  }, [adminOnly, checkAdminStatus, requireAuth]);
 
   useEffect(() => {
     if (!loading) {
       if (requireAuth && !isAuthenticated) {
         // User is not authenticated but the route requires authentication
         navigate('/login', { state: { from: location.pathname } });
+      } else if (requireAuth && adminOnly && !isAdmin) {
+        // User is authenticated but not an admin, and the route requires admin privileges
+        navigate('/dashboard', { 
+          state: { 
+            accessDenied: true, 
+            message: "You don't have permission to access this page." 
+          } 
+        });
       } else if (!requireAuth && isAuthenticated) {
         // User is authenticated but the route is for non-authenticated users only (like login page)
         navigate('/dashboard');
       }
     }
-  }, [isAuthenticated, loading, navigate, location, requireAuth]);
+  }, [isAuthenticated, isAdmin, loading, navigate, location, requireAuth, adminOnly]);
 
   // Show nothing while checking authentication
   if (loading) {
@@ -34,10 +50,6 @@ const AuthGuard = ({ children, requireAuth = true }: AuthGuardProps) => {
     );
   }
 
-  // If requireAuth is true and user is not authenticated, or
-  // if requireAuth is false and user is authenticated,
-  // the useEffect above will handle the redirect, so we don't need to return anything here.
-  
   // In all other cases, render the children
   return <>{children}</>;
 };
