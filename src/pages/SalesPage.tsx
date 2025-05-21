@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -82,8 +83,11 @@ const SalesPage = () => {
   const [isReceiptDialogOpen, setIsReceiptDialogOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [customerSummaries, setCustomerSummaries] = useState<CustomerSummary[]>([]);
   const [displayedCustomerSummaries, setDisplayedCustomerSummaries] = useState<CustomerSummary[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerSummary | null>(null);
@@ -121,6 +125,239 @@ const SalesPage = () => {
   const [deletedSales, setDeletedSales] = useState<Sale[]>([]);
   const [isShowDeletedToggled, setIsShowDeletedToggled] = useState(false);
   const [showDeletedSwitchVisible, setShowDeletedSwitchVisible] = useState(false);
+
+  // Add Detail Line function
+  const addDetailLine = () => {
+    setSaleForm(prev => ({
+      ...prev,
+      details: [
+        ...prev.details,
+        { prodcode: '', quantity: 1, unitPrice: 0, subtotal: 0 }
+      ]
+    }));
+  };
+
+  // Update Detail Line function
+  const updateDetailLine = (index: number, field: string, value: any) => {
+    setSaleForm(prev => {
+      const updatedDetails = [...prev.details];
+      
+      if (field === 'prodcode') {
+        // Find the product to get its price
+        const selectedProduct = products.find(p => p.prodcode === value);
+        const price = selectedProduct?.currentPrice || 0;
+        const quantity = updatedDetails[index].quantity;
+        
+        updatedDetails[index] = {
+          ...updatedDetails[index],
+          prodcode: value,
+          unitPrice: price,
+          subtotal: price * quantity
+        };
+      } else if (field === 'quantity') {
+        const numValue = Number(value);
+        const price = updatedDetails[index].unitPrice;
+        
+        updatedDetails[index] = {
+          ...updatedDetails[index],
+          quantity: numValue,
+          subtotal: price * numValue
+        };
+      }
+      
+      // Calculate total
+      const total = updatedDetails.reduce((sum, item) => sum + item.subtotal, 0);
+      
+      return {
+        ...prev,
+        details: updatedDetails,
+        total
+      };
+    });
+  };
+
+  // Remove Detail Line function
+  const removeDetailLine = (index: number) => {
+    setSaleForm(prev => {
+      const updatedDetails = prev.details.filter((_, i) => i !== index);
+      const total = updatedDetails.reduce((sum, item) => sum + item.subtotal, 0);
+      
+      return {
+        ...prev,
+        details: updatedDetails,
+        total
+      };
+    });
+  };
+
+  // Add Sale function
+  const addSale = async () => {
+    try {
+      // Validate form
+      if (!saleForm.custno) {
+        toast({
+          variant: "destructive",
+          title: "Missing customer",
+          description: "Please select a customer for this sale.",
+        });
+        return;
+      }
+      
+      if (!saleForm.empno) {
+        toast({
+          variant: "destructive",
+          title: "Missing employee",
+          description: "Please select an employee for this sale.",
+        });
+        return;
+      }
+      
+      if (saleForm.details.some(detail => !detail.prodcode)) {
+        toast({
+          variant: "destructive",
+          title: "Missing products",
+          description: "Please select a product for each line item.",
+        });
+        return;
+      }
+      
+      // Insert the sale header
+      const { data: saleData, error: saleError } = await supabase
+        .from('sales')
+        .insert([
+          {
+            transno: saleForm.transno,
+            salesdate: saleForm.salesdate,
+            custno: saleForm.custno,
+            empno: saleForm.empno
+          }
+        ])
+        .select();
+        
+      if (saleError) throw saleError;
+      
+      // Insert the sale details
+      const detailsToInsert = saleForm.details.map(detail => ({
+        transno: saleForm.transno,
+        prodcode: detail.prodcode,
+        quantity: detail.quantity
+      }));
+      
+      const { error: detailsError } = await supabase
+        .from('salesdetail')
+        .insert(detailsToInsert);
+        
+      if (detailsError) throw detailsError;
+      
+      toast({
+        title: "Sale created",
+        description: `Transaction #${saleForm.transno} has been created successfully.`
+      });
+      
+      setIsAddDialogOpen(false);
+      
+      // Reset form and refresh data
+      setSaleForm({
+        transno: '',
+        salesdate: new Date().toISOString().split('T')[0],
+        custno: '',
+        empno: '',
+        details: [{ prodcode: '', quantity: 1, unitPrice: 0, subtotal: 0 }],
+        total: 0
+      });
+      
+      fetchNextTransactionNumber();
+      fetchSales();
+    } catch (error) {
+      console.error('Error adding sale:', error);
+      toast({
+        variant: "destructive",
+        title: "Error creating sale",
+        description: "There was a problem creating the sale record."
+      });
+    }
+  };
+
+  // Update Sale function
+  const updateSale = async () => {
+    try {
+      // Validate form
+      if (!saleForm.custno) {
+        toast({
+          variant: "destructive",
+          title: "Missing customer",
+          description: "Please select a customer for this sale.",
+        });
+        return;
+      }
+      
+      if (!saleForm.empno) {
+        toast({
+          variant: "destructive",
+          title: "Missing employee",
+          description: "Please select an employee for this sale.",
+        });
+        return;
+      }
+      
+      if (saleForm.details.some(detail => !detail.prodcode)) {
+        toast({
+          variant: "destructive",
+          title: "Missing products",
+          description: "Please select a product for each line item.",
+        });
+        return;
+      }
+      
+      // Update the sale header
+      const { data: saleData, error: saleError } = await supabase
+        .from('sales')
+        .update({
+          salesdate: saleForm.salesdate,
+          custno: saleForm.custno,
+          empno: saleForm.empno
+        })
+        .eq('transno', saleForm.transno);
+        
+      if (saleError) throw saleError;
+      
+      // First delete all existing details
+      const { error: deleteError } = await supabase
+        .from('salesdetail')
+        .delete()
+        .eq('transno', saleForm.transno);
+        
+      if (deleteError) throw deleteError;
+      
+      // Insert the updated sale details
+      const detailsToInsert = saleForm.details.map(detail => ({
+        transno: saleForm.transno,
+        prodcode: detail.prodcode,
+        quantity: detail.quantity
+      }));
+      
+      const { error: detailsError } = await supabase
+        .from('salesdetail')
+        .insert(detailsToInsert);
+        
+      if (detailsError) throw detailsError;
+      
+      toast({
+        title: "Sale updated",
+        description: `Transaction #${saleForm.transno} has been updated successfully.`
+      });
+      
+      setIsEditDialogOpen(false);
+      fetchSales();
+    } catch (error) {
+      console.error('Error updating sale:', error);
+      toast({
+        variant: "destructive",
+        title: "Error updating sale",
+        description: "There was a problem updating the sale record."
+      });
+    }
+  };
   
   // Check if the current user is an admin
   const checkAdminStatus = async () => {
@@ -264,6 +501,7 @@ const SalesPage = () => {
       }
       
       setCustomerSummaries(Object.values(summaries));
+      setDisplayedCustomerSummaries(Object.values(summaries));
       
     } catch (error) {
       console.error('Error fetching sales:', error);
@@ -320,6 +558,7 @@ const SalesPage = () => {
         
       if (customersError) throw customersError;
       setCustomers(customersData || []);
+      setFilteredCustomers(customersData || []);
       
       // Get employees
       const { data: employeesData, error: employeesError } = await supabase
@@ -328,6 +567,7 @@ const SalesPage = () => {
         
       if (employeesError) throw employeesError;
       setEmployees(employeesData || []);
+      setFilteredEmployees(employeesData || []);
       
       // Get products with current prices
       const { data: productsData, error: productsError } = await supabase
@@ -352,6 +592,7 @@ const SalesPage = () => {
       }));
       
       setProducts(productsWithPrices);
+      setFilteredProducts(productsWithPrices);
     } catch (error) {
       console.error('Error fetching reference data:', error);
       toast({
@@ -595,6 +836,44 @@ const SalesPage = () => {
     setIsDeleteReasonDialogOpen(false);
     setIsDeleteDialogOpen(true);
   };
+  
+  // Set up search filtering
+  useEffect(() => {
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const filtered = isShowDeletedToggled ? deletedSales.filter(sale => 
+        sale.transno.toLowerCase().includes(query) ||
+        sale.customerName?.toLowerCase().includes(query) ||
+        sale.employeeName?.toLowerCase().includes(query) ||
+        sale.salesdate.toLowerCase().includes(query)
+      ) : sales.filter(sale => 
+        sale.transno.toLowerCase().includes(query) ||
+        sale.customerName?.toLowerCase().includes(query) ||
+        sale.employeeName?.toLowerCase().includes(query) ||
+        sale.salesdate.toLowerCase().includes(query)
+      );
+      
+      setFilteredSales(filtered);
+    } else {
+      setFilteredSales(isShowDeletedToggled ? deletedSales : sales);
+    }
+  }, [searchQuery, sales, deletedSales, isShowDeletedToggled]);
+
+  // Set up customer search filtering
+  useEffect(() => {
+    if (customerSearchQuery) {
+      const query = customerSearchQuery.toLowerCase();
+      const filtered = customerSales.filter(sale => 
+        sale.transno.toLowerCase().includes(query) ||
+        sale.salesdate.toLowerCase().includes(query) ||
+        String(sale.total).includes(query)
+      );
+      
+      setFilteredCustomerSales(filtered);
+    } else {
+      setFilteredCustomerSales(customerSales);
+    }
+  }, [customerSearchQuery, customerSales]);
   
   useEffect(() => {
     if (user) {
