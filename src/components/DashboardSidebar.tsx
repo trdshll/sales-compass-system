@@ -1,79 +1,78 @@
 
 import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import {
-  Users,
-  LineChart,
-  Settings,
-  LogOut,
-  Home,
-  ShoppingCart,
-  Shield
-} from 'lucide-react';
+import { BarChart3, ChevronLeft, Home, LogOut, PieChart, Settings, User } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+
+const navItems = [
+  { name: 'Dashboard', href: '/dashboard', icon: Home },
+  { name: 'Sales', href: '/sales', icon: BarChart3 },
+  { name: 'Sales Analytics', href: '/analytics', icon: PieChart },
+  { name: 'Settings', href: '/settings', icon: Settings },
+];
 
 const DashboardSidebar = () => {
-  const { logout, isAdmin } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
   
-  const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: Home },
-    { name: 'Sales', href: '/sales', icon: ShoppingCart },
-    { name: 'Analytics', href: '/analytics', icon: LineChart },
-    { name: 'Settings', href: '/settings', icon: Settings },
-  ];
-
-  // Only show admin link if user is an admin or we're forcing it for the current user
-  // This ensures the current user can access the admin page
-  const currentUserCanAccessAdmin = true; // Force access for the current user
-  
-  if (isAdmin || currentUserCanAccessAdmin) {
-    // Add Admin link if it doesn't already exist
-    if (!navigation.find(item => item.name === 'Admin')) {
-      navigation.push({ name: 'Admin', href: '/admin', icon: Shield });
-    }
-  }
-  
   return (
-    <div className="hidden md:flex flex-col w-64 bg-white dark:bg-gray-800 border-r dark:border-gray-700 shadow-sm">
-      {/* Logo */}
-      <div className="flex items-center h-16 px-4 border-b dark:border-gray-700">
-        <Link to="/dashboard" className="flex items-center">
-          <span className="text-xl font-semibold dark:text-white">Sales Compass</span>
+    <div className="h-screen w-64 flex flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border shadow-lg">
+      <div className="p-6 flex items-center justify-between bg-sidebar-accent rounded-br-lg">
+        <h1 className="text-xl font-bold text-sidebar-foreground flex items-center gap-2">
+          <span className="bg-primary rounded-full p-1 flex items-center justify-center">
+            <BarChart3 size={18} className="text-primary-foreground" />
+          </span>
+          Sales Compass
+        </h1>
+        <Link to="/" className="text-sidebar-foreground hover:text-sidebar-foreground/80 transition-colors">
+          <ChevronLeft size={20} />
         </Link>
       </div>
       
-      {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        {navigation.map((item) => {
+      <div className="px-4 py-4">
+        <div className="flex items-center gap-3 px-3 py-3 rounded-md bg-sidebar-accent/50 backdrop-blur-sm">
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white">
+            <User size={18} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{user?.name || 'User'}</p>
+            <p className="text-xs text-sidebar-foreground/70 truncate">{user?.email || 'email@example.com'}</p>
+          </div>
+        </div>
+      </div>
+      
+      <nav className="flex-1 px-4 py-4 space-y-1.5 overflow-y-auto">
+        {navItems.map((item) => {
           const isActive = location.pathname === item.href;
+          
           return (
             <Link
               key={item.name}
               to={item.href}
               className={cn(
-                'flex items-center px-4 py-2.5 text-sm font-medium rounded-md',
+                "flex items-center px-3 py-3 text-sm font-medium rounded-md transition-all",
                 isActive
-                  ? 'bg-primary/10 text-primary dark:bg-primary/20'
-                  : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/70 hover:translate-x-1"
               )}
             >
-              <item.icon className={cn('h-5 w-5 mr-3', isActive ? 'text-primary' : 'text-gray-400 dark:text-gray-500')} />
+              <item.icon className="mr-3 h-5 w-5" />
               {item.name}
             </Link>
           );
         })}
       </nav>
       
-      {/* Footer with logout */}
-      <div className="p-4 border-t dark:border-gray-700">
-        <button
+      <div className="p-4 border-t border-sidebar-border">
+        <Button
+          variant="outline"
+          className="w-full flex items-center justify-center text-sidebar-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors"
           onClick={logout}
-          className="flex w-full items-center px-4 py-2.5 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
         >
-          <LogOut className="h-5 w-5 mr-3 text-gray-400 dark:text-gray-500" />
-          Sign out
-        </button>
+          <LogOut className="mr-2 h-4 w-4" />
+          Log out
+        </Button>
       </div>
     </div>
   );
