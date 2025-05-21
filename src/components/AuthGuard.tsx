@@ -2,6 +2,7 @@
 import { ReactNode, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/components/ui/use-toast';
 
 interface AuthGuardProps {
   children: ReactNode;
@@ -13,6 +14,7 @@ const AuthGuard = ({ children, requireAuth = true, adminOnly = false }: AuthGuar
   const { isAuthenticated, loading, isAdmin, checkAdminStatus } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
 
   useEffect(() => {
     // If we need admin privileges, check admin status
@@ -28,6 +30,12 @@ const AuthGuard = ({ children, requireAuth = true, adminOnly = false }: AuthGuar
         navigate('/login', { state: { from: location.pathname } });
       } else if (requireAuth && adminOnly && !isAdmin) {
         // User is authenticated but not an admin, and the route requires admin privileges
+        toast({
+          variant: "destructive",
+          title: "Access denied",
+          description: "You don't have permission to access this page."
+        });
+        
         navigate('/dashboard', { 
           state: { 
             accessDenied: true, 
@@ -39,7 +47,7 @@ const AuthGuard = ({ children, requireAuth = true, adminOnly = false }: AuthGuar
         navigate('/dashboard');
       }
     }
-  }, [isAuthenticated, isAdmin, loading, navigate, location, requireAuth, adminOnly]);
+  }, [isAuthenticated, isAdmin, loading, navigate, location, requireAuth, adminOnly, toast]);
 
   // Show nothing while checking authentication
   if (loading) {

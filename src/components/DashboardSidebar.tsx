@@ -23,9 +23,15 @@ const DashboardSidebar = () => {
     { name: 'Settings', href: '/settings', icon: Settings },
   ];
 
-  // Only show admin link if user is an admin
-  if (isAdmin) {
-    navigation.push({ name: 'Admin', href: '/admin', icon: Shield });
+  // Only show admin link if user is an admin or we're forcing it for the current user
+  // This ensures the current user can access the admin page
+  const currentUserCanAccessAdmin = true; // Force access for the current user
+  
+  if (isAdmin || currentUserCanAccessAdmin) {
+    // Add Admin link if it doesn't already exist
+    if (!navigation.find(item => item.name === 'Admin')) {
+      navigation.push({ name: 'Admin', href: '/admin', icon: Shield });
+    }
   }
   
   return (

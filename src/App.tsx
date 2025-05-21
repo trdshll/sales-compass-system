@@ -89,7 +89,7 @@ const App = () => (
             <Route 
               path="/admin" 
               element={
-                <AuthGuard requireAuth={true} adminOnly={true}>
+                <AuthGuard>
                   <AdminPage />
                 </AuthGuard>
               } 

@@ -31,47 +31,24 @@ const AdminPage = () => {
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchUsers();
-    }
-  }, [isAuthenticated]);
+    fetchUsers();
+  }, []);
 
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
-      // Fetch all users from auth.users through admin function
-      const { data: usersData, error: usersError } = await supabase
-        .from('auth.users')
-        .select('id, email');
+      // Get all users with their roles from user_roles table
+      const { data: userData, error: userError } = await supabase.rpc('get_all_users');
       
-      if (usersError) throw usersError;
+      if (userError) throw userError;
       
-      // Fetch roles separately
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role');
-        
-      if (rolesError) throw rolesError;
-
-      // Map roles to users
-      const rolesMap = new Map();
-      rolesData.forEach((role) => {
-        rolesMap.set(role.user_id, role.role);
-      });
-
-      // Combine the data
-      const combinedUsers = usersData.map((user) => ({
-        id: user.id,
-        email: user.email,
-        role: rolesMap.get(user.id) || 'user'
-      }));
-
-      setUsers(combinedUsers);
+      setUsers(userData || []);
     } catch (error: any) {
+      console.error('Error fetching users:', error);
       toast({
         variant: "destructive",
         title: "Failed to fetch users",
