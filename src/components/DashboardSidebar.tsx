@@ -1,6 +1,6 @@
 
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, ChevronLeft, Home, LogOut, PieChart, Settings, User } from 'lucide-react';
+import { BarChart3, ChevronLeft, Home, LogOut, PieChart, Settings, User, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -62,6 +62,20 @@ const DashboardSidebar = () => {
             </Link>
           );
         })}
+
+        {/* Admin link - always visible for this user as requested */}
+        <Link
+          to="/admin"
+          className={cn(
+            "flex items-center px-3 py-3 text-sm font-medium rounded-md transition-all",
+            location.pathname === '/admin'
+              ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
+              : "text-sidebar-foreground hover:bg-sidebar-accent/70 hover:translate-x-1"
+          )}
+        >
+          <Shield className="mr-3 h-5 w-5" />
+          Admin
+        </Link>
       </nav>
       
       <div className="p-4 border-t border-sidebar-border">
