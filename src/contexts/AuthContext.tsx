@@ -14,8 +14,8 @@ interface AuthUser {
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  signup: (name: string, email: string, password: string) => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
+  signup: (name: string, email: string, password: string, role?: string) => Promise<void>;
+  login: (email: string, password: string, role?: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -80,7 +80,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  const signup = async (name: string, email: string, password: string) => {
+  const signup = async (name: string, email: string, password: string, role: string = 'user') => {
     try {
       setLoading(true);
       
@@ -88,11 +88,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         email,
         password,
         options: {
-          data: { name }
+          data: { name, role }
         }
       });
       
       if (error) throw error;
+      
+      // If role is admin, add to user_roles table
+      if (role === 'admin' && data.user) {
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .insert({ user_id: data.user.id, role: 'admin' });
+        
+        if (roleError) {
+          console.error('Error setting admin role:', roleError);
+        }
+      }
       
       toast({
         title: "Account created successfully",
@@ -112,7 +123,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, role: string = 'user') => {
     try {
       setLoading(true);
       
@@ -122,6 +133,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       
       if (error) throw error;
+      
+      // If user selected admin role, check if they're actually an admin
+      if (role === 'admin') {
+        const { data: isAdminData, error: adminCheckError } = await supabase.rpc('is_admin', {
+          user_id: data.user.id
+        });
+        
+        if (adminCheckError) throw adminCheckError;
+        
+        if (!isAdminData) {
+          await supabase.auth.signOut();
+          throw new Error('You do not have admin privileges.');
+        }
+      }
       
       toast({
         title: "Login successful",
