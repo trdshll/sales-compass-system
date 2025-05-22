@@ -94,14 +94,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (error) throw error;
       
-      // If role is admin, add to user_roles table
+      // If role is admin, add to user_roles table with explicit insert permission
       if (role === 'admin' && data.user) {
         const { error: roleError } = await supabase
           .from('user_roles')
-          .insert({ user_id: data.user.id, role: 'admin' });
+          .insert({ 
+            user_id: data.user.id, 
+            role: 'admin' 
+          });
         
         if (roleError) {
           console.error('Error setting admin role:', roleError);
+          // Even if role setting fails, allow signup to continue
+          // This prevents blocking the signup flow
         }
       }
       
@@ -140,9 +145,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           user_id: data.user.id
         });
         
-        if (adminCheckError) throw adminCheckError;
+        if (adminCheckError) {
+          console.error('Admin check error:', adminCheckError);
+          throw new Error('Error checking admin privileges. Please try again.');
+        }
+        
+        console.log('Is admin check result:', isAdminData);
         
         if (!isAdminData) {
+          // Force logout if user tries to login as admin but doesn't have admin privileges
           await supabase.auth.signOut();
           throw new Error('You do not have admin privileges.');
         }

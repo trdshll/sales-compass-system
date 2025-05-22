@@ -10,6 +10,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useAuth } from '@/contexts/AuthContext';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters long' }),
@@ -29,6 +31,7 @@ type FormData = z.infer<typeof formSchema>;
 const SignupPage = () => {
   const { signup, loading } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const [signupSuccess, setSignupSuccess] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -44,10 +47,13 @@ const SignupPage = () => {
   const onSubmit = async (data: FormData) => {
     try {
       setError(null);
+      console.log('Signup data:', { ...data, password: '[REDACTED]' });
       await signup(data.name, data.email, data.password, data.role);
-    } catch (err) {
-      setError('An error occurred during signup. Please try again.');
-      console.error(err);
+      setSignupSuccess(true);
+      form.reset();
+    } catch (err: any) {
+      console.error('Signup error:', err);
+      setError(err.message || 'An error occurred during signup. Please try again.');
     }
   };
 
@@ -64,6 +70,23 @@ const SignupPage = () => {
           <CardDescription>Enter your details to sign up</CardDescription>
         </CardHeader>
         <CardContent>
+          {signupSuccess && (
+            <Alert className="mb-4 bg-green-50 text-green-800 border-green-200">
+              <AlertTitle>Success!</AlertTitle>
+              <AlertDescription>
+                Your account has been created. Please check your email for verification and then log in.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
@@ -156,8 +179,6 @@ const SignupPage = () => {
                   </FormItem>
                 )}
               />
-              
-              {error && <p className="text-destructive text-sm">{error}</p>}
               
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? (

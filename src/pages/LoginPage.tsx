@@ -10,6 +10,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useAuth } from '@/contexts/AuthContext';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email address' }),
@@ -37,10 +39,11 @@ const LoginPage = () => {
   const onSubmit = async (data: FormData) => {
     try {
       setError(null);
+      console.log('Attempting login with:', { email: data.email, role: data.role });
       await login(data.email, data.password, data.role);
-    } catch (err) {
-      setError('Invalid email or password');
-      console.error(err);
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(err.message || 'Invalid email or password');
     }
   };
 
@@ -57,6 +60,14 @@ const LoginPage = () => {
           <CardDescription>Enter your credentials to log in</CardDescription>
         </CardHeader>
         <CardContent>
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
@@ -121,8 +132,6 @@ const LoginPage = () => {
                   </FormItem>
                 )}
               />
-              
-              {error && <p className="text-destructive text-sm">{error}</p>}
               
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? (
