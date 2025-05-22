@@ -28,11 +28,15 @@ const AuthGuard = ({
       if (requireAdmin && isAuthenticated && user) {
         try {
           setCheckingAdmin(true);
+          // Use the updated is_admin function with the fixed SQL query
           const { data, error } = await supabase.rpc('is_admin', {
             user_id: user.id
           });
           
-          if (error) throw error;
+          if (error) {
+            console.error('Error checking admin status:', error);
+            throw error;
+          }
           
           setIsAdmin(!!data);
           
